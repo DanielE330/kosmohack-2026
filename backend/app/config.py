@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     sql_echo: bool = False
 
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_login: str | None = None
+    smtp_password: str | None = None
+    mail_from: str = "SkyTime <noreply@daniel.crazedns.ru>"
+    frontend_base_url: str = "https://skytime.daniel.crazedns.ru"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
