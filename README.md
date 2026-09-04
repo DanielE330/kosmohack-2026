@@ -15,31 +15,45 @@
 ```
 .
 ├── frontend/   # Flutter-приложение (веб + мобилка, один код)
-├── backend/    # API + пайплайн обработки данных (пока пусто)
+├── backend/    # API (FastAPI + PostgreSQL) + пайплайн обработки данных
 ├── infra/      # инфраструктура для локального/демо-развёртывания (Caddy)
 ├── data/       # датасеты соревнования (train_dataset.csv и т.п.)
 ├── docs/       # официальные материалы хакатона (ТЗ, критерии, база знаний)
 └── tasks/      # бэклог по областям — что сделано и что осталось
 ```
 
-## Запуск (что работает прямо сейчас)
+## Запуск
 
-Бэкенда ещё нет — фронтенд запускается на встроенных моковых данных:
+Бэкенд (FastAPI + PostgreSQL, через Docker Compose):
+
+```bash
+cd backend
+cp .env.example .env
+docker compose up --build -d
+docker compose exec backend alembic upgrade head
+docker compose exec backend python -m app.ingestion.load_train_dataset --csv /data/train_dataset.csv
+# API: http://localhost:8000, Swagger: http://localhost:8000/docs
+```
+
+Подробнее (переменные окружения, локальный запуск без Docker, тесты,
+batch-инференс) — [`backend/README.md`](backend/README.md).
+
+Фронтенд можно запускать на моковых данных (без бэкенда) или подключить
+к поднятому бэкенду через `--dart-define=API_BASE_URL`:
 
 ```bash
 cd frontend
 flutter pub get
-flutter build web --release
+flutter build web --release --dart-define=API_BASE_URL=http://localhost:8000
 python3 -m http.server 2030 --directory build/web --bind 0.0.0.0
 # открыть http://localhost:2030
 ```
 
-Подробнее и с реальным бэкендом, когда он появится —
-[`frontend/README.md`](frontend/README.md).
+Подробнее — [`frontend/README.md`](frontend/README.md). Фронт+бэк одним
+портом через Caddy — [`infra/README.md`](infra/README.md).
 
 ## С чего начать
 
 - Что делать бэкенду/ML — [`tasks/backend.md`](tasks/backend.md) (контракт
   API, реальная схема данных, формат `submission.csv`, метрика).
 - Что осталось во фронтенде — [`tasks/frontend.md`](tasks/frontend.md).
-- Локальный прокси фронт+бэк одним портом — [`infra/README.md`](infra/README.md).
