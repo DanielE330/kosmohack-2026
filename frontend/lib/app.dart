@@ -52,7 +52,7 @@ class KosmohackApp extends StatelessWidget {
     );
 
     return MaterialApp.router(
-      title: 'Kosmohack NDVI',
+      title: 'SkyTime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF2E7D32),
