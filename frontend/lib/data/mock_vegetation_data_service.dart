@@ -21,37 +21,44 @@ class MockVegetationDataService implements VegetationDataService {
     _generateAll();
   }
 
+  // Демо-территории соответствуют реальному датасету соревнования
+  // (`data/train_dataset.csv`) — южная степная зона России, реальные
+  // культуры (озимая пшеница/подсолнечник/пастбища), координаты в том же
+  // районе, что и настоящие AOI бэкенда (~47°с.ш., ~39°в.д., см.
+  // `tasks/backend.md`). Раньше здесь были международные кейсы (дельта
+  // Меконга/Калифорния/Рондония) — заменены, чтобы демо не вводило в
+  // заблуждение по факту реальных данных.
   static const _areas = [
     DemoArea(
-      id: 'mekong-delta',
-      name: 'Дельта Меконга',
-      country: 'Вьетнам',
-      lat: 10.03,
-      lon: 105.78,
-      description: 'Рисовые чеки, сильная засуха 2019–2020.',
+      id: 'rostov-wheat',
+      name: 'Ростовская область',
+      country: 'Россия',
+      lat: 47.5,
+      lon: 40.0,
+      description: 'Озимая пшеница, почвенная засуха в фазу колошения.',
     ),
     DemoArea(
-      id: 'paradise-ca',
-      name: 'Парадайз, Калифорния',
-      country: 'США',
-      lat: 39.76,
-      lon: -121.62,
-      description: 'Сады/пастбища рядом с зоной пожара Camp Fire, 2018.',
+      id: 'krasnodar-sunflower',
+      name: 'Краснодарский край',
+      country: 'Россия',
+      lat: 45.3,
+      lon: 39.0,
+      description: 'Подсолнечник, повреждение посевов градом.',
     ),
     DemoArea(
-      id: 'rondonia-br',
-      name: 'Рондония',
-      country: 'Бразилия',
-      lat: -10.9,
-      lon: -62.8,
-      description: 'Бывший лес, распаханный под пастбище, 2021–2022.',
+      id: 'stavropol-pasture',
+      name: 'Ставропольский край',
+      country: 'Россия',
+      lat: 44.8,
+      lon: 42.5,
+      description: 'Пастбища/зерновые, деградация почвы без севооборота.',
     ),
   ];
 
   static const _cropTypeByArea = {
-    'mekong-delta': 'rice',
-    'paradise-ca': 'orchard',
-    'rondonia-br': 'pasture',
+    'rostov-wheat': 'озимая пшеница',
+    'krasnodar-sunflower': 'подсолнечник',
+    'stavropol-pasture': 'пастбища/зерновые',
   };
 
   final List<NdviPolygon> _polygons = [];
@@ -103,8 +110,8 @@ class MockVegetationDataService implements VegetationDataService {
   /// момент [t] дней от начала ряда, для каждой демо-территории.
   double _anomalyDepth(String areaId, int t) {
     switch (areaId) {
-      case 'mekong-delta':
-        // Засуха: нарастает, выходит на плато, медленно восстанавливается.
+      case 'rostov-wheat':
+        // Почвенная засуха: нарастает к колошению, плато, медленно отходит.
         const start = 420, rampUp = 60, plateau = 60, rampDown = 90;
         if (t < start || t > start + rampUp + plateau + rampDown) return 0;
         final into = t - start;
@@ -112,14 +119,14 @@ class MockVegetationDataService implements VegetationDataService {
         if (into < rampUp + plateau) return 0.32;
         final decayInto = into - rampUp - plateau;
         return 0.32 * (1 - decayInto / rampDown);
-      case 'paradise-ca':
-        // Пожар: резкое падение, медленное восстановление за ~7 месяцев.
+      case 'krasnodar-sunflower':
+        // Град: резкое однократное повреждение, восстановление за ~7 мес.
         const start = 300, recovery = 210;
         if (t < start) return 0;
         if (t > start + recovery) return 0;
         return 0.42 * (1 - (t - start) / recovery);
-      case 'rondonia-br':
-        // Вырубка под пастбище: постоянное ступенчатое снижение, усиливается.
+      case 'stavropol-pasture':
+        // Деградация почвы без севооборота: постоянное снижение, усиливается.
         const start = 240;
         if (t < start) return 0;
         final monthsIn = (t - start) / 30.0;
@@ -259,10 +266,14 @@ class MockVegetationDataService implements VegetationDataService {
       endDate: points[endIdx].date,
       severity: worst.status,
       minZScore: worst.zScore,
-      deviation: worst.value - worst.climatologyMean,
+      // Мок всегда генерирует климатологию, поэтому здесь она точно известна.
+      deviation: worst.value - worst.climatologyMean!,
       explanation: explanation,
     );
   }
+
+  @override
+  bool get requiresAuth => false;
 
   @override
   List<DemoArea> getDemoAreas() => _areas;
@@ -283,7 +294,12 @@ class MockVegetationDataService implements VegetationDataService {
       label: 'Мой полигон $_customCounter',
       cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
       areaId: nearest.id,
-      points: points,
+      // Копируем список: caller (MapScreen) переиспользует и очищает свой
+      // `_draftPoints` сразу после отправки, и если бы мы хранили ту же
+      // ссылку, у только что созданного полигона мгновенно опустел бы
+      // `points` — а `NdviPolygon.centroid` на пустом списке падает с
+      // `Bad state: No element` при следующей перерисовке карты.
+      points: List<LatLng>.from(points),
       isCustom: true,
     );
     _polygons.add(polygon);
@@ -291,6 +307,30 @@ class MockVegetationDataService implements VegetationDataService {
     _timeseries[id] = series;
     _anomalies[id] = _buildAnomalies(id, nearest.id, series);
     return polygon;
+  }
+
+  @override
+  Future<NdviPolygon> updatePolygon(
+    String polygonId, {
+    String? label,
+    String? cropType,
+    List<LatLng>? points,
+  }) async {
+    final index = _polygons.indexWhere((p) => p.id == polygonId);
+    if (index == -1) {
+      throw Exception('Полигон $polygonId не найден');
+    }
+    final current = _polygons[index];
+    final updated = NdviPolygon(
+      id: current.id,
+      label: label ?? current.label,
+      cropType: cropType ?? current.cropType,
+      areaId: current.areaId,
+      points: points ?? current.points,
+      isCustom: current.isCustom,
+    );
+    _polygons[index] = updated;
+    return updated;
   }
 
   @override

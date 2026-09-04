@@ -1,4 +1,4 @@
-from datetime import date
+import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -9,7 +9,7 @@ class NdviPointOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    date: date = Field(..., examples=["2025-06-14"])
+    date: datetime.date = Field(..., examples=["2025-06-14"])
     primary_ndvi: float | None = Field(
         None,
         description="Реальное наблюдение NDVI на эту дату; null — если это пропуск "
@@ -42,7 +42,7 @@ class NdviObservationIn(BaseModel):
     `POST /timeseries/{anon_polygon_id}/upload` — формат как в
     `train_dataset.csv`/`private_features.csv`."""
 
-    date: date = Field(..., examples=["2025-06-14"])
+    date: datetime.date = Field(..., examples=["2025-06-14"])
     s2_ndvi: float | None = Field(None, examples=[0.61])
     s2_evi: float | None = Field(None, examples=[0.42])
     s2_ndwi: float | None = Field(None, examples=[0.12])

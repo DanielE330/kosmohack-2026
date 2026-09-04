@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'data/auth_repository.dart';
+import 'data/http_auth_repository.dart';
 import 'data/http_vegetation_data_service.dart';
+import 'data/mock_auth_repository.dart';
 import 'data/mock_vegetation_data_service.dart';
 import 'data/vegetation_data_service.dart';
 
@@ -13,11 +17,20 @@ const _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   await initializeDateFormatting('ru');
 
-  final VegetationDataService service = _apiBaseUrl.isEmpty
-      ? MockVegetationDataService()
-      : HttpVegetationDataService(baseUrl: _apiBaseUrl);
+  late final VegetationDataService service;
+  late final AuthRepository auth;
+  if (_apiBaseUrl.isEmpty) {
+    final mockAuth = MockAuthRepository();
+    service = MockVegetationDataService();
+    auth = mockAuth;
+  } else {
+    final httpAuth = HttpAuthRepository(baseUrl: _apiBaseUrl);
+    service = HttpVegetationDataService(baseUrl: _apiBaseUrl, tokenProvider: () => httpAuth.token);
+    auth = httpAuth;
+  }
 
-  runApp(KosmohackApp(service: service));
+  runApp(KosmohackApp(service: service, auth: auth));
 }
