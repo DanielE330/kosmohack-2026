@@ -55,7 +55,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
     try {
       await widget.auth.confirmEmail(token);
       if (!mounted) return;
-      context.go('/');
+      context.go('/map');
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -70,7 +70,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/map'),
         ),
         title: const Text('Подтверждение почты'),
       ),

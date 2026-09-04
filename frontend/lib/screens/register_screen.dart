@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/map'),
         ),
         title: const Text('Регистрация'),
       ),

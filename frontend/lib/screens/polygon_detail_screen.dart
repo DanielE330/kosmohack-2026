@@ -202,6 +202,10 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     final canManage = _polygon.isCustom;
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/map'),
+        ),
         title: Text(_polygon.label),
         actions: [
           IconButton(

@@ -39,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      context.go('/');
+      context.go('/map');
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/map'),
         ),
         title: const Text('Вход'),
       ),
