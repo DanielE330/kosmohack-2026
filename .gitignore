@@ -1,48 +1,31 @@
 # Claude Code session artifacts
 .claude/
 
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# OS junk
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+Thumbs.db
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
+# Editors
 .idea/
+.vscode/
+*.iml
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Secrets / local env overrides
+.env
+.env.*
+!.env.example
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
+# Python (backend, once it exists)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Caddy runtime state (if run locally from repo root)
+infra/caddy/caddy
+infra/caddy_data/
+infra/caddy_config/
+
+# Stray build output at repo root (Flutter build artifacts live under
+# frontend/build/, ignored via frontend/.gitignore already)
 /build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release

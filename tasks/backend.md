@@ -2,8 +2,9 @@
 
 Собрано по итогам чтения официального ТЗ («КОСМОХАКАТОН — Постановка задачи»,
 оригинал `рнд.космохакатон.рф/storage/docs/doc-1788536456.pdf`, копия лежит
-в репозитории — `docs/tz.pdf`) и того контракта,
-который уже реализован во Flutter-части (`lib/data/vegetation_data_service.dart`).
+в репозитории — [`../docs/tz.pdf`](../docs/tz.pdf)) и того контракта,
+который уже реализован во Flutter-части
+(`../frontend/lib/data/vegetation_data_service.dart`).
 На момент записи в репозитории `DanielE330/kosmohack-2026` нет ни одного
 коммита от бэкенд/ML — этот файл нужен, чтобы стартовать без созвона.
 
@@ -27,7 +28,8 @@
 
 ## 1. Данные соревнования
 
-`train_dataset.csv` уже есть в репозитории — `data/train_dataset.csv`
+`train_dataset.csv` уже есть в репозитории —
+[`../data/train_dataset.csv`](../data/train_dataset.csv)
 (получен от организаторов 2026-09-04, положил как есть). `private_features.csv`
 всё ещё не найден — искать на платформе хакатона.
 
@@ -108,7 +110,7 @@ Z = (NDVI_факт − NDVI_climatology_mean) / NDVI_climatology_std
 ```
 
 Пороги — **зафиксированы во Flutter-части, менять только синхронно**
-(`lib/models/ndvi_point.dart`, `ndviStatusForZ`):
+(`../frontend/lib/models/ndvi_point.dart`, `ndviStatusForZ`):
 
 | Z | Статус |
 |---|---|
@@ -123,11 +125,13 @@ Z = (NDVI_факт − NDVI_climatology_mean) / NDVI_climatology_std
 
 ## 4. API-контракт, который уже ждёт Flutter-клиент
 
-Реализован в `lib/data/vegetation_data_service.dart` (интерфейс) и
-`lib/data/http_vegetation_data_service.dart` (HTTP-клиент, сейчас не
-подключён — включается флагом `--dart-define=API_BASE_URL=http://host:port`
-в `lib/main.dart`). Точная форма JSON — в `fromJson`/`toJson` моделей
-(`lib/models/ndvi_point.dart`, `ndvi_polygon.dart`, `anomaly.dart`).
+Реализован в `../frontend/lib/data/vegetation_data_service.dart` (интерфейс)
+и `../frontend/lib/data/http_vegetation_data_service.dart` (HTTP-клиент,
+сейчас не подключён — включается флагом
+`--dart-define=API_BASE_URL=http://host:port` в `../frontend/lib/main.dart`).
+Точная форма JSON — в `fromJson`/`toJson` моделей (в
+`../frontend/lib/models/`: `ndvi_point.dart`, `ndvi_polygon.dart`,
+`anomaly.dart`).
 
 ### `GET /polygons`
 Список полигонов для отображения на карте (открытые контуры
@@ -194,6 +198,9 @@ OSM/ESA WorldCereal или уже сохранённые пользовател�
 полигоны цветом по статусу, а не растровый оверлей. Если решите всё же
 делать растровые тайлы — это доп. фича, не обязательная.
 
+Для локального/демо-развёртывания за одним портом (веб-сервис + API) есть
+стартовый Caddy-конфиг — [`../infra/README.md`](../infra/README.md).
+
 ## 5. Отдельно от веб-сервиса: technical batch-инференс
 
 Спецификация явно требует **вторую, независимую точку входа**: скрипт/CLI,
@@ -221,7 +228,9 @@ OSM/ESA WorldCereal или уже сохранённые пользовател�
 
 ## 7. Что уже сделано во Flutter и на что можно опираться
 
-- `lib/data/mock_vegetation_data_service.dart` — генерирует моковые ряды
+См. также [`frontend.md`](frontend.md) — отдельный бэклог по фронтенду.
+
+- `../frontend/lib/data/mock_vegetation_data_service.dart` — генерирует моковые ряды
   ровно в этой форме (наблюдение/gap/restored/климатология/crop_type) для
   6 демо-полигонов (2 на каждую из 3 демо-территорий) + умеет на лету
   сочинять ряд для нарисованного пользователем полигона. Можно смотреть
