@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../data/vegetation_data_service.dart';
@@ -26,6 +27,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
   List<NdviPoint> _points = [];
   List<Anomaly> _anomalies = [];
   bool _loading = true;
+  bool _deleting = false;
   String? _error;
 
   @override
@@ -56,11 +58,63 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
+  /// Критерий «Управление полигонами» требует не только добавлять, но и
+  /// удалять выбранные участки — см. tasks/backend.md (DELETE /polygons/{id}).
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить полигон?'),
+        content: Text('«${widget.polygon.label}» будет убран из набора. '
+            'Действие необратимо.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await widget.service.deletePolygon(widget.polygon.id);
+      if (!mounted) return;
+      // Возврат назад: MapScreen сам перезапросит список полигонов после
+      // того, как этот push разрешится (см. _openPolygon в map_screen.dart).
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось удалить полигон: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.polygon.label),
+        actions: [
+          IconButton(
+            icon: _deleting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline),
+            tooltip: 'Удалить полигон',
+            onPressed: (_loading || _deleting) ? null : _confirmDelete,
+          ),
+        ],
       ),
       body: _buildBody(),
     );

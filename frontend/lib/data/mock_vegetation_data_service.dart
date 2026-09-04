@@ -58,6 +58,7 @@ class MockVegetationDataService implements VegetationDataService {
   final Map<String, List<NdviPoint>> _timeseries = {};
   final Map<String, List<Anomaly>> _anomalies = {};
   int _customCounter = 0;
+  int _foundCounter = 0;
 
   void _generateAll() {
     for (final area in _areas) {
@@ -275,15 +276,7 @@ class MockVegetationDataService implements VegetationDataService {
     final id = 'CUSTOM-$_customCounter';
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
     final centroidLon = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
-
-    // Ближайшая демо-территория определяет, какой сценарий аномалии
-    // унаследует нарисованный полигон — так демо остаётся связным, где бы
-    // пользователь ни рисовал.
-    final nearest = _areas.reduce((a, b) {
-      final da = _dist(a.lat, a.lon, centroidLat, centroidLon);
-      final db = _dist(b.lat, b.lon, centroidLat, centroidLon);
-      return da < db ? a : b;
-    });
+    final nearest = _nearestArea(centroidLat, centroidLon);
 
     final polygon = NdviPolygon(
       id: id,
@@ -298,6 +291,77 @@ class MockVegetationDataService implements VegetationDataService {
     _timeseries[id] = series;
     _anomalies[id] = _buildAnomalies(id, nearest.id, series);
     return polygon;
+  }
+
+  @override
+  Future<void> deletePolygon(String polygonId) async {
+    _polygons.removeWhere((p) => p.id == polygonId);
+    _timeseries.remove(polygonId);
+    _anomalies.remove(polygonId);
+  }
+
+  @override
+  Future<List<NdviPolygon>> findPolygonsInRegion({
+    required double minLat,
+    required double minLon,
+    required double maxLat,
+    required double maxLon,
+  }) async {
+    // Сначала смотрим, что из уже известных полигонов попадает в область —
+    // так повторный поиск по тому же месту не плодит дублей.
+    final existing = _polygons.where((p) {
+      final c = p.centroid;
+      return c.latitude >= minLat &&
+          c.latitude <= maxLat &&
+          c.longitude >= minLon &&
+          c.longitude <= maxLon;
+    }).toList();
+    if (existing.isNotEmpty) return existing;
+
+    // Ничего нет — эмулируем автопоиск открытых сельхозконтуров
+    // (OSM/ESA WorldCereal) для новой территории: генерируем пару
+    // правдоподобных полигонов внутри области.
+    final centerLat = (minLat + maxLat) / 2;
+    final centerLon = (minLon + maxLon) / 2;
+    final nearest = _nearestArea(centerLat, centerLon);
+    final dLat = (maxLat - minLat).abs() * 0.12;
+    final dLon = (maxLon - minLon).abs() * 0.12;
+    if (dLat == 0 || dLon == 0) return [];
+
+    final found = <NdviPolygon>[];
+    for (int i = 0; i < 2; i++) {
+      _foundCounter++;
+      final id = 'FOUND-$_foundCounter';
+      final sign = i == 0 ? -1 : 1;
+      final cLat = centerLat + sign * dLat;
+      final cLon = centerLon + sign * dLon;
+      final polygon = NdviPolygon(
+        id: id,
+        label: 'Найденный контур $_foundCounter',
+        cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
+        areaId: nearest.id,
+        points: [
+          LatLng(cLat - dLat, cLon - dLon),
+          LatLng(cLat - dLat, cLon + dLon),
+          LatLng(cLat + dLat, cLon + dLon),
+          LatLng(cLat + dLat, cLon - dLon),
+        ],
+      );
+      _polygons.add(polygon);
+      final series = _generateSeries(nearest.id, seedOffset: 20 + _foundCounter);
+      _timeseries[id] = series;
+      _anomalies[id] = _buildAnomalies(id, nearest.id, series);
+      found.add(polygon);
+    }
+    return found;
+  }
+
+  DemoArea _nearestArea(double lat, double lon) {
+    return _areas.reduce((a, b) {
+      final da = _dist(a.lat, a.lon, lat, lon);
+      final db = _dist(b.lat, b.lon, lat, lon);
+      return da < db ? a : b;
+    });
   }
 
   double _dist(double lat1, double lon1, double lat2, double lon2) {

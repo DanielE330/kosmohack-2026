@@ -65,4 +65,51 @@ void main() {
     final points = await service.getTimeseries(polygon.id);
     expect(points, isNotEmpty);
   });
+
+  test('deleting a polygon removes it and its data', () async {
+    final polygon = await service.submitCustomPolygon(const [
+      LatLng(10.0, 105.7),
+      LatLng(10.0, 105.8),
+      LatLng(10.1, 105.8),
+      LatLng(10.1, 105.7),
+    ]);
+
+    await service.deletePolygon(polygon.id);
+
+    final polygons = await service.getPolygons();
+    expect(polygons.any((p) => p.id == polygon.id), isFalse);
+    expect(await service.getTimeseries(polygon.id), isEmpty);
+    expect(await service.getAnomalies(polygonId: polygon.id), isEmpty);
+  });
+
+  test('findPolygonsInRegion returns already-known polygons inside the bbox',
+      () async {
+    // Дельта Меконга — оба демо-полигона в пределах ~0.05°.
+    final found = await service.findPolygonsInRegion(
+      minLat: 9.9,
+      minLon: 105.6,
+      maxLat: 10.2,
+      maxLon: 105.9,
+    );
+    expect(found, isNotEmpty);
+    expect(found.every((p) => p.areaId == 'mekong-delta'), isTrue);
+  });
+
+  test('findPolygonsInRegion auto-discovers contours for an empty area',
+      () async {
+    // Область без демо-полигонов и без запусков "нарисовать" — сервис
+    // должен сам предложить найденные контуры.
+    final found = await service.findPolygonsInRegion(
+      minLat: 45.0,
+      minLon: 40.0,
+      maxLat: 45.2,
+      maxLon: 40.2,
+    );
+    expect(found.length, 2);
+    expect(found.every((p) => !p.isCustom), isTrue);
+
+    for (final polygon in found) {
+      expect(await service.getTimeseries(polygon.id), isNotEmpty);
+    }
+  });
 }

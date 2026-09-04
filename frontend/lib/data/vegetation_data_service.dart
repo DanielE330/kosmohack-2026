@@ -6,10 +6,12 @@ import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 
 /// Контракт, соответствующий реальной схеме данных соревнования (по ТЗ):
-///   GET  /polygons                         -> открытые контуры AOI (OSM/ESA WorldCereal)
-///   POST /polygons/custom {points}         -> регистрирует нарисованный пользователем AOI, возвращает его id
-///   GET  /timeseries/{anon_polygon_id}      -> `List<NdviPoint>` (primary_ndvi + восстановление пропусков)
-///   GET  /anomalies?polygon_id={id}         -> `List<Anomaly>` (диапазоны Z-score)
+///   GET    /polygons?region={bbox}           -> открытые контуры AOI (OSM/ESA WorldCereal);
+///                                                с `region` — автопоиск контуров в указанной области
+///   POST   /polygons/custom {points}         -> регистрирует нарисованный пользователем AOI, возвращает его id
+///   DELETE /polygons/{id}                    -> удаляет полигон из набора пользователя
+///   GET    /timeseries/{anon_polygon_id}      -> `List<NdviPoint>` (primary_ndvi + восстановление пропусков)
+///   GET    /anomalies?polygon_id={id}         -> `List<Anomaly>` (диапазоны Z-score)
 ///
 /// Соревнование также требует *отдельную* точку входа для технического
 /// batch-инференса (`private_features.csv` -> `submission.csv`) — это
@@ -27,6 +29,18 @@ abstract class VegetationDataService {
 
   Future<List<NdviPolygon>> getPolygons();
   Future<NdviPolygon> submitCustomPolygon(List<LatLng> points);
+  Future<void> deletePolygon(String polygonId);
+
+  /// Автопоиск доступных сельхозконтуров в указанном bbox — критерий
+  /// «Управление полигонами» требует это как отдельную от ручного рисования
+  /// возможность (см. tasks/backend.md).
+  Future<List<NdviPolygon>> findPolygonsInRegion({
+    required double minLat,
+    required double minLon,
+    required double maxLat,
+    required double maxLon,
+  });
+
   Future<List<NdviPoint>> getTimeseries(String polygonId);
   Future<List<Anomaly>> getAnomalies({String? polygonId});
 }
