@@ -52,8 +52,11 @@ class _LandingScreenState extends State<LandingScreen> {
   Future<void> _load() async {
     try {
       final polygons = await widget.service.getPolygons();
-      for (final p in polygons) {
-        _timeseries[p.id] = await widget.service.getTimeseries(p.id);
+      // Параллельно — на реальном бэкенде с десятками полигонов
+      // последовательные await-запросы заметно тормозили загрузку.
+      final allSeries = await Future.wait(polygons.map((p) => widget.service.getTimeseries(p.id)));
+      for (var i = 0; i < polygons.length; i++) {
+        _timeseries[polygons[i].id] = allSeries[i];
       }
       final dates = _timeseries.values.expand((l) => l.map((p) => p.date)).toSet().toList()
         ..sort();

@@ -11,6 +11,7 @@ import '../models/ndvi_polygon.dart';
 import '../route_observer.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/about_dialog.dart';
+import '../widgets/dashboard_shell.dart';
 import '../widgets/skytime_logo.dart';
 import '../widgets/time_slider.dart';
 
@@ -95,8 +96,12 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     });
     try {
       final polygons = await widget.service.getPolygons();
-      for (final p in polygons) {
-        _timeseries[p.id] = await widget.service.getTimeseries(p.id);
+      // Параллельно, а не по одному — на реальном бэкенде с десятками
+      // полигонов последовательные await-запросы давали заметную задержку
+      // загрузки карты (каждый timeseries — отдельный HTTP-запрос).
+      final allSeries = await Future.wait(polygons.map((p) => widget.service.getTimeseries(p.id)));
+      for (var i = 0; i < polygons.length; i++) {
+        _timeseries[polygons[i].id] = allSeries[i];
       }
       final dates = _timeseries.values.expand((l) => l.map((p) => p.date)).toSet().toList()
         ..sort();
@@ -247,8 +252,9 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         maxLat: bounds.north,
         maxLon: bounds.east,
       );
-      for (final p in found) {
-        _timeseries[p.id] = await widget.service.getTimeseries(p.id);
+      final foundSeries = await Future.wait(found.map((p) => widget.service.getTimeseries(p.id)));
+      for (var i = 0; i < found.length; i++) {
+        _timeseries[found[i].id] = foundSeries[i];
       }
       final knownIds = _polygons.map((p) => p.id).toSet();
       if (!mounted) return;
@@ -275,7 +281,9 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DashboardShell(
+      active: DashboardSection.map,
+      child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.info_outline),
@@ -328,6 +336,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
           return KeyEventResult.ignored;
         },
         child: _buildBody(),
+      ),
       ),
     );
   }
