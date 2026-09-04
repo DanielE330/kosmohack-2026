@@ -21,8 +21,15 @@ class NdviPoint {
   final double? observedNdvi;
   final double restoredNdvi;
   final bool isSyntheticGap;
-  final double climatologyMean;
-  final double climatologyStd;
+
+  /// В реальном датасете соревнования (`train_dataset.csv`) климатическая
+  /// норма заполнена только для строк с реальным наблюдением — для
+  /// пропусков (естественных и `is_synthetic_gap`) она замаскирована,
+  /// так же как и остальные вычисляемые признаки (см. ТЗ, раздел про
+  /// `private_features.csv`). Поэтому оба поля нужно считать опциональными,
+  /// а не обязательными, как было раньше.
+  final double? climatologyMean;
+  final double? climatologyStd;
   final String cropType;
 
   const NdviPoint({
@@ -42,10 +49,16 @@ class NdviPoint {
   /// оценка.
   double get value => observedNdvi ?? restoredNdvi;
 
-  double get zScore =>
-      climatologyStd == 0 ? 0 : (value - climatologyMean) / climatologyStd;
+  bool get hasClimatology => climatologyMean != null && climatologyStd != null;
 
-  NdviStatus get status => ndviStatusForZ(zScore);
+  /// 0, если климатическая норма для этой точки неизвестна (см. выше) —
+  /// такая точка не может быть признана аномальной, только «нет данных».
+  double get zScore {
+    if (!hasClimatology || climatologyStd == 0) return 0;
+    return (value - climatologyMean!) / climatologyStd!;
+  }
+
+  NdviStatus get status => hasClimatology ? ndviStatusForZ(zScore) : NdviStatus.normal;
 
   factory NdviPoint.fromJson(Map<String, dynamic> json) {
     return NdviPoint(
@@ -53,8 +66,8 @@ class NdviPoint {
       observedNdvi: (json['primary_ndvi'] as num?)?.toDouble(),
       restoredNdvi: (json['primary_ndvi_pred'] as num).toDouble(),
       isSyntheticGap: json['is_synthetic_gap'] as bool? ?? false,
-      climatologyMean: (json['climatology_mean'] as num).toDouble(),
-      climatologyStd: (json['climatology_std'] as num).toDouble(),
+      climatologyMean: (json['climatology_mean'] as num?)?.toDouble(),
+      climatologyStd: (json['climatology_std'] as num?)?.toDouble(),
       cropType: json['crop_type'] as String? ?? 'unknown',
     );
   }

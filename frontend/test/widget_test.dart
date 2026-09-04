@@ -112,4 +112,23 @@ void main() {
       expect(await service.getTimeseries(polygon.id), isNotEmpty);
     }
   });
+
+  test(
+      'NdviPoint.fromJson tolerates null climatology '
+      '(real backend masks it for gap rows)', () {
+    final point = NdviPoint.fromJson({
+      'date': '2010-04-01',
+      'primary_ndvi': null,
+      'primary_ndvi_pred': 0.33,
+      'is_synthetic_gap': false,
+      'climatology_mean': null,
+      'climatology_std': null,
+      'crop_type': 'озимая пшеница',
+    });
+
+    expect(point.hasClimatology, isFalse);
+    expect(point.zScore, 0);
+    expect(point.status, NdviStatus.normal);
+    expect(point.value, 0.33);
+  });
 }

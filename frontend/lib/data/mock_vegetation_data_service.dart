@@ -259,7 +259,8 @@ class MockVegetationDataService implements VegetationDataService {
       endDate: points[endIdx].date,
       severity: worst.status,
       minZScore: worst.zScore,
-      deviation: worst.value - worst.climatologyMean,
+      // Мок всегда генерирует климатологию, поэтому здесь она точно известна.
+      deviation: worst.value - worst.climatologyMean!,
       explanation: explanation,
     );
   }

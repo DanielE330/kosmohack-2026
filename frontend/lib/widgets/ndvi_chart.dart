@@ -30,9 +30,14 @@ class NdviChart extends StatelessWidget {
     for (int i = 0; i < points.length; i++) {
       final p = points[i];
       valueSpots.add(FlSpot(i.toDouble(), p.value));
-      normSpots.add(FlSpot(i.toDouble(), p.climatologyMean));
-      upperSpots.add(FlSpot(i.toDouble(), p.climatologyMean + p.climatologyStd));
-      lowerSpots.add(FlSpot(i.toDouble(), p.climatologyMean - p.climatologyStd));
+      // Климатическая норма замаскирована в реальных данных для строк-
+      // пропусков — пропускаем такие точки в полосе нормы, а не рисуем
+      // провал в 0.
+      if (p.hasClimatology) {
+        normSpots.add(FlSpot(i.toDouble(), p.climatologyMean!));
+        upperSpots.add(FlSpot(i.toDouble(), p.climatologyMean! + p.climatologyStd!));
+        lowerSpots.add(FlSpot(i.toDouble(), p.climatologyMean! - p.climatologyStd!));
+      }
     }
 
     return LineChart(
