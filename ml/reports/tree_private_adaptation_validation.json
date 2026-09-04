@@ -1,0 +1,243 @@
+{
+  "protocol": "ExtraTrees residuals are seed-held-out and same-row forbidden; Ridge/ExtraTrees weights are selected on four polygon folds",
+  "rows": 13713,
+  "v5_oof_rmse": 0.06164344548211847,
+  "nested_v7_oof_rmse": 0.06147254155370125,
+  "nested_improvement": 0.00017090392841721813,
+  "fixed_v7_oof_rmse": 0.061405260417668216,
+  "fixed_improvement": 0.00023818506445025256,
+  "production_blend_by_crop": {
+    "зерновые": [
+      0.45,
+      0.45
+    ],
+    "озимая пшеница": [
+      0.3,
+      0.2
+    ],
+    "пастбища/зерновые": [
+      0.15,
+      0.45
+    ],
+    "подсолнечник": [
+      0.2,
+      0.3
+    ]
+  },
+  "folds": [
+    {
+      "outer_fold": 0,
+      "rows": 2817,
+      "v5_rmse": 0.06410351183766427,
+      "nested_v7_rmse": 0.06401252616536002
+    },
+    {
+      "outer_fold": 1,
+      "rows": 2532,
+      "v5_rmse": 0.0555086333524534,
+      "nested_v7_rmse": 0.055358910780503846
+    },
+    {
+      "outer_fold": 2,
+      "rows": 2787,
+      "v5_rmse": 0.06131120197606624,
+      "nested_v7_rmse": 0.06128653921738936
+    },
+    {
+      "outer_fold": 3,
+      "rows": 2787,
+      "v5_rmse": 0.06451974384321531,
+      "nested_v7_rmse": 0.06426123012014753
+    },
+    {
+      "outer_fold": 4,
+      "rows": 2790,
+      "v5_rmse": 0.0617910513882073,
+      "nested_v7_rmse": 0.06146402577509263
+    }
+  ],
+  "seeds": [
+    {
+      "synthetic_seed": 13,
+      "rows": 4571,
+      "v5_rmse": 0.06283023433827527,
+      "nested_v7_rmse": 0.06264571519715782
+    },
+    {
+      "synthetic_seed": 42,
+      "rows": 4571,
+      "v5_rmse": 0.05914753912346123,
+      "nested_v7_rmse": 0.058943927337407526
+    },
+    {
+      "synthetic_seed": 87,
+      "rows": 4571,
+      "v5_rmse": 0.06287824251167308,
+      "nested_v7_rmse": 0.06275147721523051
+    }
+  ],
+  "crops": [
+    {
+      "crop_type": "зерновые",
+      "rows": 3675,
+      "v5_rmse": 0.054612654454035826,
+      "nested_v7_rmse": 0.05408266094493655
+    },
+    {
+      "crop_type": "озимая пшеница",
+      "rows": 7146,
+      "v5_rmse": 0.06829281122524299,
+      "nested_v7_rmse": 0.06825044764414871
+    },
+    {
+      "crop_type": "пастбища/зерновые",
+      "rows": 801,
+      "v5_rmse": 0.041243344300000775,
+      "nested_v7_rmse": 0.040951082550889084
+    },
+    {
+      "crop_type": "подсолнечник",
+      "rows": 2091,
+      "v5_rmse": 0.055567955799718974,
+      "nested_v7_rmse": 0.055497989085432214
+    }
+  ],
+  "nested_selected_weights": [
+    {
+      "fold": 0,
+      "crop_type": "зерновые",
+      "training_rows": 2916,
+      "validation_rows": 759,
+      "ridge_weight": 0.4,
+      "tree_weight": 0.45
+    },
+    {
+      "fold": 0,
+      "crop_type": "озимая пшеница",
+      "training_rows": 5517,
+      "validation_rows": 1629,
+      "ridge_weight": 0.35000000000000003,
+      "tree_weight": 0.15000000000000002
+    },
+    {
+      "fold": 0,
+      "crop_type": "подсолнечник",
+      "training_rows": 1662,
+      "validation_rows": 429,
+      "ridge_weight": 0.25,
+      "tree_weight": 0.4
+    },
+    {
+      "fold": 1,
+      "crop_type": "зерновые",
+      "training_rows": 2937,
+      "validation_rows": 738,
+      "ridge_weight": 0.45,
+      "tree_weight": 0.5
+    },
+    {
+      "fold": 1,
+      "crop_type": "озимая пшеница",
+      "training_rows": 6174,
+      "validation_rows": 972,
+      "ridge_weight": 0.25,
+      "tree_weight": 0.2
+    },
+    {
+      "fold": 1,
+      "crop_type": "пастбища/зерновые",
+      "training_rows": 396,
+      "validation_rows": 405,
+      "ridge_weight": 0.0,
+      "tree_weight": 0.5
+    },
+    {
+      "fold": 1,
+      "crop_type": "подсолнечник",
+      "training_rows": 1674,
+      "validation_rows": 417,
+      "ridge_weight": 0.1,
+      "tree_weight": 0.30000000000000004
+    },
+    {
+      "fold": 2,
+      "crop_type": "зерновые",
+      "training_rows": 2928,
+      "validation_rows": 747,
+      "ridge_weight": 0.45,
+      "tree_weight": 0.5
+    },
+    {
+      "fold": 2,
+      "crop_type": "озимая пшеница",
+      "training_rows": 5919,
+      "validation_rows": 1227,
+      "ridge_weight": 0.35000000000000003,
+      "tree_weight": 0.2
+    },
+    {
+      "fold": 2,
+      "crop_type": "пастбища/зерновые",
+      "training_rows": 405,
+      "validation_rows": 396,
+      "ridge_weight": 0.35000000000000003,
+      "tree_weight": 0.35000000000000003
+    },
+    {
+      "fold": 2,
+      "crop_type": "подсолнечник",
+      "training_rows": 1674,
+      "validation_rows": 417,
+      "ridge_weight": 0.25,
+      "tree_weight": 0.25
+    },
+    {
+      "fold": 3,
+      "crop_type": "зерновые",
+      "training_rows": 3276,
+      "validation_rows": 399,
+      "ridge_weight": 0.45,
+      "tree_weight": 0.45
+    },
+    {
+      "fold": 3,
+      "crop_type": "озимая пшеница",
+      "training_rows": 5175,
+      "validation_rows": 1971,
+      "ridge_weight": 0.30000000000000004,
+      "tree_weight": 0.15000000000000002
+    },
+    {
+      "fold": 3,
+      "crop_type": "подсолнечник",
+      "training_rows": 1674,
+      "validation_rows": 417,
+      "ridge_weight": 0.25,
+      "tree_weight": 0.25
+    },
+    {
+      "fold": 4,
+      "crop_type": "зерновые",
+      "training_rows": 2643,
+      "validation_rows": 1032,
+      "ridge_weight": 0.45,
+      "tree_weight": 0.35000000000000003
+    },
+    {
+      "fold": 4,
+      "crop_type": "озимая пшеница",
+      "training_rows": 5799,
+      "validation_rows": 1347,
+      "ridge_weight": 0.2,
+      "tree_weight": 0.25
+    },
+    {
+      "fold": 4,
+      "crop_type": "подсолнечник",
+      "training_rows": 1680,
+      "validation_rows": 411,
+      "ridge_weight": 0.15000000000000002,
+      "tree_weight": 0.25
+    }
+  ]
+}

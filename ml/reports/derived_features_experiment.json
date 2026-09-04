@@ -1,0 +1,116 @@
+{
+  "original_feature_count": 193,
+  "new_feature_count": 234,
+  "global": {
+    "rows": 13713,
+    "polygons": 39,
+    "baseline_mean_rmse": 0.09047560022728675,
+    "baseline_linear_rmse": 0.09178826821094284,
+    "baseline_climatology_rmse": 0.1587946097243561,
+    "baseline_rmse": 0.08860827963233711,
+    "oof_rmse": 0.06343512814053873,
+    "oof_gapscore": 10.97,
+    "residual_weight": 1.0499999999999998,
+    "clip_predictions": false,
+    "folds": [
+      {
+        "fold": 0,
+        "polygons": 8,
+        "rows": 2817,
+        "baseline_rmse": 0.08899767821478728,
+        "model_rmse": 0.0665687792142918
+      },
+      {
+        "fold": 1,
+        "polygons": 7,
+        "rows": 2532,
+        "baseline_rmse": 0.08086459258671401,
+        "model_rmse": 0.056968212802896864
+      },
+      {
+        "fold": 2,
+        "polygons": 8,
+        "rows": 2787,
+        "baseline_rmse": 0.08638061306414954,
+        "model_rmse": 0.06317195761606119
+      },
+      {
+        "fold": 3,
+        "polygons": 8,
+        "rows": 2787,
+        "baseline_rmse": 0.09303977072330147,
+        "model_rmse": 0.06646683196085282
+      },
+      {
+        "fold": 4,
+        "polygons": 8,
+        "rows": 2790,
+        "baseline_rmse": 0.09250880109080849,
+        "model_rmse": 0.06311633715426178
+      }
+    ]
+  },
+  "ensemble": {
+    "special_crop": "озимая пшеница",
+    "rows": 13713,
+    "wheat_rows": 7146,
+    "global_oof_rmse": 0.06343512814053873,
+    "ensemble_oof_rmse": 0.0632442847410817,
+    "absolute_improvement": 0.000190843399457033,
+    "relative_improvement_pct": 0.30084813422970447,
+    "wheat_global_rmse": 0.07005524120740181,
+    "wheat_specialist_rmse": 0.07137241402356442,
+    "wheat_ensemble_rmse": 0.06972333755648984,
+    "wheat_residual_weight": 0.9999999999999999,
+    "wheat_blend_weight": 0.30000000000000004,
+    "clip_predictions": false,
+    "accepted": true,
+    "folds": [
+      {
+        "fold": 0,
+        "rows": 2817,
+        "wheat_rows": 1629,
+        "global_rmse": 0.06658703146718695,
+        "ensemble_rmse": 0.06627598856199764,
+        "wheat_global_rmse": 0.06857187596056426,
+        "wheat_ensemble_rmse": 0.06804878912902322
+      },
+      {
+        "fold": 1,
+        "rows": 2532,
+        "wheat_rows": 972,
+        "global_rmse": 0.057034376407076745,
+        "ensemble_rmse": 0.05678577944200899,
+        "wheat_global_rmse": 0.060706900970953326,
+        "wheat_ensemble_rmse": 0.060096756964057856
+      },
+      {
+        "fold": 2,
+        "rows": 2787,
+        "wheat_rows": 1227,
+        "global_rmse": 0.06325726915513556,
+        "ensemble_rmse": 0.062724108178564,
+        "wheat_global_rmse": 0.07598916539565957,
+        "wheat_ensemble_rmse": 0.07497858017364947
+      },
+      {
+        "fold": 3,
+        "rows": 2787,
+        "wheat_rows": 1971,
+        "global_rmse": 0.06632375640217011,
+        "ensemble_rmse": 0.06628800523150671,
+        "wheat_global_rmse": 0.07193250358605269,
+        "wheat_ensemble_rmse": 0.07188589046088273
+      },
+      {
+        "fold": 4,
+        "rows": 2790,
+        "wheat_rows": 1347,
+        "global_rmse": 0.06291350438929197,
+        "ensemble_rmse": 0.06307550962161419,
+        "wheat_global_rmse": 0.06970708100288729,
+        "wheat_ensemble_rmse": 0.07000966771695381
+      }
+    ]
+  }
+}
