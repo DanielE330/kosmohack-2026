@@ -41,7 +41,8 @@ async def upload_timeseries(
     `train_dataset.csv`/`private_features.csv`), сохраняет их и
     пересчитывает восстановление пропусков и аномалии по всему полигону
     (см. `app/services/gapfill.py`, `app/services/anomaly_detection.py` —
-    заглушки, готовые к замене на ML)."""
+    используют реальную ML-модель через `app/services/ml_bridge.py`, с
+    откатом на baseline-эвристики, если ML недоступен)."""
     polygon = await db.get(Polygon, anon_polygon_id)
     if polygon is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
