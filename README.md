@@ -1,17 +1,26 @@
-# kosmohack_app
+# Kosmohack 2026 — мониторинг вегетационной динамики
 
-A new Flutter project.
+Хакатон «КОСМОХАКАТОН»: сервис для мониторинга состояния растительности
+сельскохозяйственных полигонов по спутниковым временным рядам NDVI —
+восстановление пропусков и детекция аномалий (Z-score). Полное ТЗ —
+[`docs/tz.pdf`](docs/tz.pdf).
 
-## Getting Started
+## Структура репозитория
 
-This project is a starting point for a Flutter application.
+```
+.
+├── frontend/   # Flutter-приложение (веб + мобилка, один код)
+├── backend/    # API + пайплайн обработки данных (пока пусто)
+├── infra/      # инфраструктура для локального/демо-развёртывания (Caddy)
+├── data/       # датасеты соревнования (train_dataset.csv и т.п.)
+├── docs/       # официальные материалы хакатона (ТЗ)
+└── tasks/      # бэклог по областям — что сделано и что осталось
+```
 
-A few resources to get you started if this is your first Flutter project:
+## С чего начать
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Что делать бэкенду/ML — [`tasks/backend.md`](tasks/backend.md) (контракт
+  API, реальная схема данных, формат `submission.csv`, метрика).
+- Что осталось во фронтенде — [`tasks/frontend.md`](tasks/frontend.md).
+- Запуск Flutter-части — [`frontend/README.md`](frontend/README.md).
+- Локальный прокси фронт+бэк одним портом — [`infra/README.md`](infra/README.md).

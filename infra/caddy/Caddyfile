@@ -1,0 +1,27 @@
+# Local/demo reverse proxy: serves the built Flutter web bundle and
+# forwards /api/* to the backend once it exists.
+#
+# Run from repo root after `cd frontend && flutter build web --release`:
+#   caddy run --config infra/caddy/Caddyfile --adapter caddyfile
+#
+# BACKEND_UPSTREAM defaults to localhost:8000 (typical FastAPI dev port) —
+# override with an env var once the backend's real host/port is known:
+#   BACKEND_UPSTREAM=localhost:8000 caddy run --config infra/caddy/Caddyfile
+
+{$CADDY_ADDR:localhost:2030} {
+	# Backend API — see ../../tasks/backend.md for the routes it must serve
+	# (/polygons, /polygons/custom, /timeseries/{id}, /anomalies).
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy {$BACKEND_UPSTREAM:localhost:8000}
+	}
+
+	# Flutter web build output.
+	handle {
+		root * ../../frontend/build/web
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}
