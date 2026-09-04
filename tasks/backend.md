@@ -11,6 +11,23 @@
 Критерии оценки — [`../docs/criteria.pdf`](../docs/criteria.pdf) (сводка —
 [`../docs/KNOWLEDGE_BASE.md`](../docs/KNOWLEDGE_BASE.md#2-критерии-оценки--100-баллов)).
 
+## Статус и распределение (2026-09-04)
+
+- **Готово и проверено вживую через Docker**: FastAPI + PostgreSQL,
+  миграции (включая подтверждение почты), регистрация → подтверждение →
+  вход, CRUD своих полигонов с авторизацией. По пути нашли и починили два
+  реальных бага: Pydantic `date: date` clash в `schemas/timeseries.py`, и
+  несовместимость `passlib`+`bcrypt 5.0.0` (регистрация падала 500) —
+  зафиксировано `bcrypt==4.0.1` в `requirements.txt`.
+- **Тесты эндпоинтов готовы** (`tests/test_auth.py`, `tests/test_polygons.py`,
+  см. раздел «Тесты» в `../backend/README.md`) — 12/12 проходят.
+- **П.2 (алгоритм восстановления пропусков), п.3 (детекция аномалий),
+  автоматический сбор данных для нового региона** — этим занимается
+  ML-часть команды (своя модель), не переделывать без синхронизации.
+- **П.0 (открытый вопрос про anon_polygon_id ↔ реальные координаты)** —
+  сознательно не приоритизируем сейчас (решение команды), сам вопрос
+  остаётся открытым ниже на случай, если понадобится вернуться.
+
 ## 0. Открытый вопрос — решить в первую очередь
 
 `anon_polygon_id` в `train_dataset.csv` / `private_features.csv`
@@ -127,6 +144,57 @@ Z = (NDVI_факт − NDVI_climatology_mean) / NDVI_climatology_std
 `explanation` ответа.
 
 ## 4. API-контракт, который уже ждёт Flutter-клиент
+
+**Обновление:** реализация появилась и смёржена в `main`
+(FastAPI + PostgreSQL, `backend/app/`) — поля ответов сделаны один в один
+под Flutter-модели (см. докстринги в `backend/app/schemas/*.py`, там прямо
+процитированы `frontend/lib/models/*.dart`). Расхождения с тем, что уже
+реализует Flutter, ниже.
+
+**Реально прогнал интеграцию** (`docker compose up`, миграции, загрузка
+`data/train_dataset.csv`, Flutter собран с `--dart-define=API_BASE_URL=...`
+против живого бэкенда) и нашёл/поправил два бага:
+
+- **Бэкенд не запускался вообще.** `backend/app/schemas/timeseries.py`:
+  поле `date: date` при `from datetime import date` — классическая
+  Pydantic v2 ошибка (имя поля совпадает с именем типа), крашила старт
+  приложения (`PydanticUserError: ... field name clashing with a type
+  annotation`). Поправил на `import datetime` + `datetime.date` в обоих
+  местах (`NdviPointOut`, `NdviObservationIn`).
+- **Климатология реально бывает `null` в ответе** (`climatology_mean`/
+  `climatology_std` — замаскированы для строк-пропусков, ровно как в
+  `train_dataset.csv`), а Flutter-модель `NdviPoint.fromJson` делала
+  нестрахуемый `as num` и падала бы на ~70% реальных точек. Сделал поля
+  опциональными во Flutter (`frontend/lib/models/ndvi_point.dart`) — при
+  отсутствии климатологии точка считается «без данных» (не аномальной),
+  а не крашит рендер.
+
+После этого весь сценарий (39 реальных полигонов, реальные временные
+ряды, реальные аномалии с ERA5-объяснениями) отработал в браузере без
+ошибок.
+
+**⚠️ Авторизация — расхождение с согласованным контрактом.**
+`POST /polygons/custom` и `DELETE /polygons/{id}` теперь требуют JWT
+(`Depends(get_current_user)`, см. `backend/app/api/routes/polygons.py`).
+В `docs/tz.pdf` и в исходном контракте, который уже реализует
+`HttpVegetationDataService`, авторизации не было — сам backend/README.md
+называет её «учебным расширением», не частью задачи. Пока
+`HttpVegetationDataService` не шлёт `Authorization`, поэтому рисование и
+удаление полигона против реального бэкенда сейчас вернут 401/403.
+Решить одним из двух способов (обсудить с бэкенд-разработчиком, не решать
+только с фронта):
+- Backend: убрать `Depends(get_current_user)` с этих двух роутов, оставить
+  auth опциональной/выключенной для хакатон-версии — проще всего.
+- Frontend: реализовать прозрачную анонимную регистрацию/логин при
+  старте приложения и слать `Authorization: Bearer <token>` — больше
+  работы ради фичи, которой не было в ТЗ.
+
+**Ещё не реализовано на бэкенде:** параметр `region` у `GET /polygons`
+(автопоиск контуров — Flutter уже его вызывает, см. `frontend.md`).
+
+**Разница в схеме:** `PolygonOut.area_id` у бэкенда всегда `null`
+(поле для демо-группировки, не часть их модели `Polygon`) — Flutter это
+переживает нормально (поле опциональное).
 
 Реализован в `../frontend/lib/data/vegetation_data_service.dart` (интерфейс)
 и `../frontend/lib/data/http_vegetation_data_service.dart` (HTTP-клиент,

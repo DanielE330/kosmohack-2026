@@ -17,4 +17,5 @@ class UserRead(BaseModel):
     id: int = Field(..., examples=[1])
     email: EmailStr
     full_name: str | None
+    is_email_confirmed: bool
     created_at: datetime

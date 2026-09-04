@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
 import '../models/ndvi_point.dart';
@@ -14,20 +16,24 @@ class PolygonDetailScreen extends StatefulWidget {
     super.key,
     required this.service,
     required this.polygon,
+    required this.auth,
   });
 
   final VegetationDataService service;
   final NdviPolygon polygon;
+  final AuthRepository auth;
 
   @override
   State<PolygonDetailScreen> createState() => _PolygonDetailScreenState();
 }
 
 class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
+  late NdviPolygon _polygon = widget.polygon;
   List<NdviPoint> _points = [];
   List<Anomaly> _anomalies = [];
   bool _loading = true;
   bool _deleting = false;
+  bool _saving = false;
   String? _error;
 
   @override
@@ -42,9 +48,9 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
       _error = null;
     });
     try {
-      final points = await widget.service.getTimeseries(widget.polygon.id);
+      final points = await widget.service.getTimeseries(_polygon.id);
       final anomalies =
-          await widget.service.getAnomalies(polygonId: widget.polygon.id);
+          await widget.service.getAnomalies(polygonId: _polygon.id);
       setState(() {
         _points = points;
         _anomalies = anomalies..sort((a, b) => b.startDate.compareTo(a.startDate));
@@ -58,14 +64,94 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
+  bool get _needsLogin => !widget.auth.isLoggedIn;
+
+  void _promptLogin() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Чтобы изменять свои полигоны, нужно войти'),
+        action: SnackBarAction(label: 'Войти', onPressed: () => context.push('/login')),
+      ),
+    );
+  }
+
+  /// Update — четвёртая часть CRUD, кроме создания/чтения/удаления: смена
+  /// подписи и культуры своего полигона (см. tasks/backend.md, PUT
+  /// /polygons/{id}). Геометрию не редактируем — для этого есть
+  /// «нарисовать заново» отдельным полигоном.
+  Future<void> _editDialog() async {
+    if (_needsLogin) {
+      _promptLogin();
+      return;
+    }
+    final labelController = TextEditingController(text: _polygon.label);
+    final cropController = TextEditingController(text: _polygon.cropType);
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Редактировать полигон'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: labelController,
+              decoration: const InputDecoration(labelText: 'Подпись'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: cropController,
+              decoration: const InputDecoration(labelText: 'Культура'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    if (result != true) return;
+
+    setState(() => _saving = true);
+    try {
+      final updated = await widget.service.updatePolygon(
+        _polygon.id,
+        label: labelController.text.trim().isEmpty ? null : labelController.text.trim(),
+        cropType: cropController.text.trim().isEmpty ? null : cropController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _polygon = updated;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось сохранить: $e')),
+      );
+    }
+  }
+
   /// Критерий «Управление полигонами» требует не только добавлять, но и
   /// удалять выбранные участки — см. tasks/backend.md (DELETE /polygons/{id}).
   Future<void> _confirmDelete() async {
+    if (_needsLogin) {
+      _promptLogin();
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Удалить полигон?'),
-        content: Text('«${widget.polygon.label}» будет убран из набора. '
+        content: Text('«${_polygon.label}» будет убран из набора. '
             'Действие необратимо.'),
         actions: [
           TextButton(
@@ -83,10 +169,11 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
 
     setState(() => _deleting = true);
     try {
-      await widget.service.deletePolygon(widget.polygon.id);
+      await widget.service.deletePolygon(_polygon.id);
       if (!mounted) return;
       // Возврат назад: MapScreen сам перезапросит список полигонов после
-      // того, как этот push разрешится (см. _openPolygon в map_screen.dart).
+      // возврата (RouteObserver.didPopNext, см. map_screen.dart) —
+      // независимо от того, стрелкой в приложении или браузерной «назад».
       context.pop();
     } catch (e) {
       if (!mounted) return;
@@ -97,23 +184,49 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
+  /// Просмотр полигона (`GET /polygons`, `/timeseries`, `/anomalies`)
+  /// публичный и не требует токена — значит прямая ссылка на этот экран
+  /// уже сама по себе и есть «поделиться зоной»: тот, кому её отправили,
+  /// откроет ровно этот же полигон без входа в аккаунт.
+  Future<void> _share() async {
+    final link = Uri.base.toString();
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ссылка на полигон скопирована в буфер обмена')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canManage = _polygon.isCustom;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.polygon.label),
+        title: Text(_polygon.label),
         actions: [
           IconButton(
-            icon: _deleting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.delete_outline),
-            tooltip: 'Удалить полигон',
-            onPressed: (_loading || _deleting) ? null : _confirmDelete,
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Поделиться ссылкой на полигон',
+            onPressed: _share,
           ),
+          if (canManage) ...[
+            IconButton(
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.edit_outlined),
+              tooltip: 'Редактировать',
+              onPressed: (_loading || _saving || _deleting) ? null : _editDialog,
+            ),
+            IconButton(
+              icon: _deleting
+                  ? const SizedBox(
+                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.delete_outline),
+              tooltip: 'Удалить полигон',
+              onPressed: (_loading || _deleting || _saving) ? null : _confirmDelete,
+            ),
+          ],
         ],
       ),
       body: _buildBody(),
@@ -146,7 +259,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 720;
         final content = [
-          _PolygonHeader(polygon: widget.polygon, restoredCount: restoredCount, total: _points.length),
+          _PolygonHeader(polygon: _polygon, restoredCount: restoredCount, total: _points.length),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
