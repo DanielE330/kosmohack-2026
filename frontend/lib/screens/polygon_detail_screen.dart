@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -63,7 +64,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
-  bool get _needsLogin => widget.service.requiresAuth && !widget.auth.isLoggedIn;
+  bool get _needsLogin => !widget.auth.isLoggedIn;
 
   void _promptLogin() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -183,6 +184,19 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
+  /// Просмотр полигона (`GET /polygons`, `/timeseries`, `/anomalies`)
+  /// публичный и не требует токена — значит прямая ссылка на этот экран
+  /// уже сама по себе и есть «поделиться зоной»: тот, кому её отправили,
+  /// откроет ровно этот же полигон без входа в аккаунт.
+  Future<void> _share() async {
+    final link = Uri.base.toString();
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ссылка на полигон скопирована в буфер обмена')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canManage = _polygon.isCustom;
@@ -190,6 +204,11 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
       appBar: AppBar(
         title: Text(_polygon.label),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Поделиться ссылкой на полигон',
+            onPressed: _share,
+          ),
           if (canManage) ...[
             IconButton(
               icon: _saving

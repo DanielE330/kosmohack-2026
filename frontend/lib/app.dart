@@ -5,11 +5,13 @@ import 'data/auth_repository.dart';
 import 'data/vegetation_data_service.dart';
 import 'models/ndvi_polygon.dart';
 import 'route_observer.dart';
+import 'screens/account_screen.dart';
 import 'screens/confirm_email_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/polygon_detail_screen.dart';
 import 'screens/register_screen.dart';
+import 'theme.dart';
 
 class KosmohackApp extends StatelessWidget {
   const KosmohackApp({
@@ -33,7 +35,11 @@ class KosmohackApp extends StatelessWidget {
           // отдельного лендинга и клика «Попробовать демо». Описание
           // проекта доступно из карты по кнопке «О проекте», не блокируя
           // доступ к самой карте.
-          builder: (context, state) => MapScreen(service: service, auth: auth),
+          builder: (context, state) => MapScreen(
+            service: service,
+            auth: auth,
+            startDrawing: state.uri.queryParameters['draw'] == '1',
+          ),
         ),
         GoRoute(
           path: '/polygon/:id',
@@ -42,6 +48,10 @@ class KosmohackApp extends StatelessWidget {
             id: state.pathParameters['id']!,
             auth: auth,
           ),
+        ),
+        GoRoute(
+          path: '/account',
+          builder: (context, state) => AccountScreen(service: service, auth: auth),
         ),
         GoRoute(
           path: '/login',
@@ -65,10 +75,7 @@ class KosmohackApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'SkyTime',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF2E7D32),
-        useMaterial3: true,
-      ),
+      theme: buildSkyTimeTheme(),
       routerConfig: router,
     );
   }
