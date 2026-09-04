@@ -27,14 +27,38 @@
 - **П.0 (открытый вопрос про anon_polygon_id ↔ реальные координаты)** —
   сознательно не приоритизируем сейчас (решение команды), сам вопрос
   остаётся открытым ниже на случай, если понадобится вернуться.
-- **ML-решение от напарника смержено** (`backend/ml/`, PR #1, 2026-09-05) —
-  обученные модели восстановления пропусков + реальная интерпретация причин
-  аномалий (heat_and_drought/moisture_deficit/heat_stress/cold_stress/
-  possible_harvest/weather_or_harvest/sensor_conflict/unconfirmed). Идёт
-  подключение офлайн-части (без GEE) к `backend/app/services/gapfill.py` и
-  `anomaly_detection.py` через новый `backend/app/services/ml_bridge.py` —
-  работает на уже загруженном `data/train_dataset.csv`, деградирует на
-  прежний baseline, если ML-зависимостей/модели нет в окружении.
+- **ML-решение от напарника смержено и подключено** (`backend/ml/`, PR #1,
+  2026-09-05) — офлайн-часть (без GEE) полностью заведена в веб-сервис через
+  `backend/app/services/ml_bridge.py`: `gapfill.fill_gaps` теперь в первую
+  очередь использует обученную модель `backend/ml/models/gap_model.joblib`
+  (контракт `pipeline.restore_and_analyze`), а `anomaly_detection.explain_anomaly`
+  — реальную интерпретацию причин (heat_and_drought/moisture_deficit/
+  heat_stress/cold_stress/possible_harvest/weather_or_harvest/sensor_conflict/
+  unconfirmed) из `anomalies.add_interpretation`, с confidence и
+  `requires_review`. Обе точки входа при любой проблеме (нет зависимостей,
+  нет файла модели, версия sklearn не читает pickle и т.п.) молча
+  откатываются на прежний baseline (линейная интерполяция / грубая
+  ERA5-эвристика) — веб-сервис не падает при отсутствии ML в окружении.
+  `backend/requirements.txt` зафиксирован на тех же версиях numpy/scipy/
+  scikit-learn/joblib, что и `backend/ml/requirements.txt`, чтобы модель
+  без проблем распаковывалась (`joblib.load`).
+  Проверено: `docker compose run --rm backend pytest` — 32/32 зелёные
+  (сам `docker compose build` в текущей рабочей среде не проходит из-за
+  сетевой/TLS-инфраструктурной проблемы с Docker Hub, не связанной с кодом
+  — собрано и провалидировано на идентичном образе с другим базовым тегом
+  Python); отдельно прогнан ручной end-to-end на реальных строках
+  `train_dataset.csv` — `fill_gaps` даёт вменяемые значения NDVI (без NaN,
+  в диапазоне сенсора) и на synthetic-gap тесте (15% скрытых точек, 5
+  полигонов) даёт RMSE 0.076 против 0.093 у линейной интерполяции; причины
+  аномалий по всем 39 полигонам действительно покрывают все 8 категорий
+  из ML README (не откатываются молча на эвристику). Batch-инференс для
+  официальной сдачи (`submission.csv`) — отдельно, через `backend/ml/src/
+  inference.py` (`python -m src.inference` из `backend/ml/`), уже на
+  реальной модели; веб-сервисный `backend/inference/run_inference.py`
+  (написан бэкенд-командой ещё до мержа ML) остаётся на baseline-
+  интерполяции и, по-хорошему, стоит удалить или тоже переключить на
+  `ml_bridge`, чтобы не было двух путей с разным качеством — не делал это
+  сейчас, т.к. вне заявленного скоупа этой сессии.
 - **GEE (Google Earth Engine) ещё не подключён** — нужен для двух вещей:
   live-анализа произвольно нарисованного пользователем полигона (`/analyze`
   в `backend/ml/webapp/main.py`) и настоящего автопоиска контуров полей по
