@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import '../models/ndvi_point.dart';
 import '../utils/ndvi_style.dart';
 
-/// Line chart of the plotted NDVI value (`value` — real observation, or the
-/// gap-filled estimate where none exists) against the climate-norm band
-/// (mean +/- std). Observed points are solid dots; gap-filled/restored
-/// points are hollow rings, so the "исходный vs восстановленный ряд" the
-/// spec asks for is visually explicit. Points are coloured by their
-/// Z-score band (normal/suppression/critical).
+/// Линейный график отображаемого значения NDVI (`value` — реальное
+/// наблюдение либо восстановленная оценка, если наблюдения нет) на фоне
+/// климатической нормы (среднее +/- std). Точки наблюдений — сплошные
+/// кружки; восстановленные/gap-filled точки — полые кольца, так что
+/// «исходный vs восстановленный ряд», требуемый ТЗ, виден визуально.
+/// Точки окрашены по диапазону Z-score (штатно/угнетение/критично).
 class NdviChart extends StatelessWidget {
   const NdviChart({super.key, required this.points});
 
@@ -90,7 +90,7 @@ class NdviChart extends StatelessWidget {
           ),
         ),
         lineBarsData: [
-          // Climate-norm band (upper/lower), filled between them.
+          // Полоса климатической нормы (верх/низ), закрашенная между ними.
           LineChartBarData(
             spots: upperSpots,
             isCurved: true,
@@ -111,7 +111,7 @@ class NdviChart extends StatelessWidget {
             barWidth: 0,
             dotData: const FlDotData(show: false),
           ),
-          // Climate norm mean, dashed.
+          // Среднее климатической нормы, пунктиром.
           LineChartBarData(
             spots: normSpots,
             isCurved: true,
@@ -120,8 +120,8 @@ class NdviChart extends StatelessWidget {
             dashArray: [6, 4],
             dotData: const FlDotData(show: false),
           ),
-          // Plotted NDVI value; solid dots = real observation, hollow
-          // rings = gap-filled/restored, coloured by Z-score band.
+          // Отображаемое значение NDVI; сплошные точки = реальное
+          // наблюдение, полые кольца = восстановлено, цвет по Z-score.
           LineChartBarData(
             spots: valueSpots,
             isCurved: true,

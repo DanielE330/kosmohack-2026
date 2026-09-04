@@ -1,11 +1,11 @@
 import 'ndvi_point.dart';
 
-/// Only the two non-normal [NdviStatus] bands ever form an [Anomaly] period.
+/// Период аномалии образуют только два «не штатных» статуса [NdviStatus].
 typedef AnomalySeverity = NdviStatus;
 
-/// A contiguous run of dates whose Z-score fell below -1 (suppression) or
-/// -2 (critical) — see [ndviStatusForZ]. [severity] is the worst status
-/// reached anywhere in the run.
+/// Непрерывный отрезок дат, на которых Z-score опустился ниже -1
+/// (угнетение) или -2 (критическая аномалия) — см. [ndviStatusForZ].
+/// [severity] — худший статус, достигнутый где-либо внутри отрезка.
 class Anomaly {
   final String id;
   final String polygonId;
@@ -13,8 +13,8 @@ class Anomaly {
   final DateTime endDate;
   final AnomalySeverity severity;
   final double minZScore;
-  /// Deviation from the climate norm, e.g. -0.35 means NDVI dropped 0.35
-  /// below the expected seasonal value.
+  /// Отклонение от климатической нормы, например -0.35 значит, что NDVI
+  /// упал на 0.35 ниже ожидаемого сезонного значения.
   final double deviation;
   final String explanation;
 

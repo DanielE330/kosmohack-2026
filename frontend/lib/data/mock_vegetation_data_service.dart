@@ -8,12 +8,14 @@ import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
 
-/// Fake backend used until the real data-processing pipeline (GEE/Copernicus
-/// ingestion + gap-filling + Z-score anomaly service) is ready. Ships with
-/// three demo areas, each with a couple of field polygons, so the anomaly
-/// story is always demonstrable offline — and models the same shape the
-/// real API will: per-polygon time series with `primary_ndvi` observations,
-/// synthetic/natural gaps, gap-filled values and a climatology band.
+/// Фейковый бэкенд на время, пока не готов реальный пайплайн обработки
+/// данных (приём GEE/Copernicus + восстановление пропусков + сервис
+/// аномалий по Z-score). Содержит три демо-территории, у каждой по паре
+/// полигонов, так что сюжет с аномалией всегда демонстрируем офлайн — и
+/// моделирует ту же форму данных, что будет у реального API: временной
+/// ряд по полигону с наблюдениями `primary_ndvi`, синтетическими/
+/// естественными пропусками, восстановленными значениями и полосой
+/// климатической нормы.
 class MockVegetationDataService implements VegetationDataService {
   MockVegetationDataService() {
     _generateAll();
@@ -70,8 +72,8 @@ class MockVegetationDataService implements VegetationDataService {
   }
 
   NdviPolygon _makePolygon(DemoArea area, int index) {
-    // Small offset boxes near the area centroid, standing in for
-    // OSM/ESA WorldCereal field contours.
+    // Небольшие прямоугольники со смещением от центра территории — заглушка
+    // вместо реальных контуров полей OSM/ESA WorldCereal.
     final dLat = 0.01 + index * 0.018;
     final dLon = 0.01 + index * 0.018;
     final corners = [
@@ -89,19 +91,19 @@ class MockVegetationDataService implements VegetationDataService {
     );
   }
 
-  /// Smooth seasonal baseline (no anomaly, no noise) — this is also what
-  /// the climatology mean/std is derived from.
+  /// Гладкая сезонная база (без аномалии и без шума) — из неё же считается
+  /// среднее/std климатической нормы.
   double _seasonal(DateTime date) {
     final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
     return 0.55 + 0.2 * sin((dayOfYear / 365.0) * 2 * pi);
   }
 
-  /// Magnitude (positive number, to be subtracted) of the scripted anomaly
-  /// at [t] days since the series start, per demo area.
+  /// Величина (положительное число, вычитается) сценарной аномалии на
+  /// момент [t] дней от начала ряда, для каждой демо-территории.
   double _anomalyDepth(String areaId, int t) {
     switch (areaId) {
       case 'mekong-delta':
-        // Drought: ramps in, plateaus, slowly recovers.
+        // Засуха: нарастает, выходит на плато, медленно восстанавливается.
         const start = 420, rampUp = 60, plateau = 60, rampDown = 90;
         if (t < start || t > start + rampUp + plateau + rampDown) return 0;
         final into = t - start;
@@ -110,13 +112,13 @@ class MockVegetationDataService implements VegetationDataService {
         final decayInto = into - rampUp - plateau;
         return 0.32 * (1 - decayInto / rampDown);
       case 'paradise-ca':
-        // Fire: sudden drop, slow regrowth over ~7 months.
+        // Пожар: резкое падение, медленное восстановление за ~7 месяцев.
         const start = 300, recovery = 210;
         if (t < start) return 0;
         if (t > start + recovery) return 0;
         return 0.42 * (1 - (t - start) / recovery);
       case 'rondonia-br':
-        // Deforestation-for-pasture: permanent step down, deepening.
+        // Вырубка под пастбище: постоянное ступенчатое снижение, усиливается.
         const start = 240;
         if (t < start) return 0;
         final monthsIn = (t - start) / 30.0;
@@ -146,10 +148,10 @@ class MockVegetationDataService implements VegetationDataService {
       final noise = (rand.nextDouble() - 0.5) * 0.03;
       trueValues[i] = (seasonal - depth + noise).clamp(0.02, 0.95);
 
-      // ~22% chance of no usable satellite observation (cloud/shadow).
+      // ~22% шанс отсутствия пригодного спутникового наблюдения (облако/тень).
       final isGap = rand.nextDouble() < 0.22;
       observed[i] = !isGap;
-      // Of the gaps, ~40% are the organizers' hidden control points.
+      // Из пропусков ~40% — скрытые контрольные точки организаторов.
       isSynthetic[i] = isGap && rand.nextDouble() < 0.4;
     }
 
@@ -181,9 +183,9 @@ class MockVegetationDataService implements VegetationDataService {
     return points;
   }
 
-  /// Baseline gap-fill: average of the previous and next step's underlying
-  /// value (falls back to whichever side exists at the series edges) — the
-  /// same simple approach the task PDF describes as the starting baseline.
+  /// Базовое восстановление пропуска: среднее «истинных» значений
+  /// соседних шагов (на краях ряда берётся та сторона, что есть) — тот же
+  /// простой подход, что описан в ТЗ как стартовый baseline.
   double _interpolate(Map<int, double> trueValues, int index, int maxIndex) {
     final before = index > 0 ? trueValues[index - 1] : null;
     final after = index < maxIndex ? trueValues[index + 1] : null;
@@ -274,9 +276,9 @@ class MockVegetationDataService implements VegetationDataService {
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
     final centroidLon = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
 
-    // Nearest demo area decides which scripted anomaly narrative this
-    // hand-drawn polygon inherits, so the demo stays coherent wherever
-    // the user draws.
+    // Ближайшая демо-территория определяет, какой сценарий аномалии
+    // унаследует нарисованный полигон — так демо остаётся связным, где бы
+    // пользователь ни рисовал.
     final nearest = _areas.reduce((a, b) {
       final da = _dist(a.lat, a.lon, centroidLat, centroidLon);
       final db = _dist(b.lat, b.lon, centroidLat, centroidLon);

@@ -1,9 +1,9 @@
 import 'package:latlong2/latlong.dart';
 
-/// One agricultural field contour — the unit of selection the spec requires
-/// ("AOI / полигон поля"). In the real dataset this is identified only by
-/// an anonymous `anon_polygon_id`; [label] is a friendly caption we add for
-/// the demo UI, not part of the competition data.
+/// Контур одного сельхозполя — единица выбора, которую требует ТЗ
+/// ("AOI / полигон поля"). В реальном датасете идентифицируется только
+/// анонимным `anon_polygon_id`; [label] — дружелюбная подпись для демо-UI,
+/// не часть данных соревнования.
 class NdviPolygon {
   final String id;
   final String label;
