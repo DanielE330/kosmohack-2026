@@ -135,7 +135,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Чтобы рисовать и удалять свои полигоны, нужно войти'),
-        action: SnackBarAction(label: 'Войти', onPressed: () => context.push('/login')),
+        action: SnackBarAction(label: 'Войти', onPressed: () => context.go('/login')),
       ),
     );
   }
@@ -155,7 +155,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   }
 
   void _openPolygon(NdviPolygon polygon) {
-    context.push('/polygon/${polygon.id}');
+    context.go('/polygon/${polygon.id}');
   }
 
   Future<void> _finishDrawing() async {
@@ -247,7 +247,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
           IconButton(
             icon: Icon(widget.auth.isLoggedIn ? Icons.account_circle : Icons.account_circle_outlined),
             tooltip: widget.auth.isLoggedIn ? 'Личный кабинет (${widget.auth.email})' : 'Личный кабинет',
-            onPressed: () => context.push('/account'),
+            onPressed: () => context.go('/account'),
           ),
         ],
       ),
