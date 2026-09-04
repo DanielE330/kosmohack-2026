@@ -1,14 +1,18 @@
-enum AnomalyType { drought, fire, deforestation, flood, unknown }
+import 'ndvi_point.dart';
 
-enum AnomalySeverity { low, medium, high }
+/// Only the two non-normal [NdviStatus] bands ever form an [Anomaly] period.
+typedef AnomalySeverity = NdviStatus;
 
+/// A contiguous run of dates whose Z-score fell below -1 (suppression) or
+/// -2 (critical) — see [ndviStatusForZ]. [severity] is the worst status
+/// reached anywhere in the run.
 class Anomaly {
   final String id;
-  final String regionId;
+  final String polygonId;
   final DateTime startDate;
-  final DateTime? endDate;
-  final AnomalyType type;
+  final DateTime endDate;
   final AnomalySeverity severity;
+  final double minZScore;
   /// Deviation from the climate norm, e.g. -0.35 means NDVI dropped 0.35
   /// below the expected seasonal value.
   final double deviation;
@@ -16,11 +20,11 @@ class Anomaly {
 
   const Anomaly({
     required this.id,
-    required this.regionId,
+    required this.polygonId,
     required this.startDate,
-    this.endDate,
-    required this.type,
+    required this.endDate,
     required this.severity,
+    required this.minZScore,
     required this.deviation,
     required this.explanation,
   });
@@ -28,19 +32,14 @@ class Anomaly {
   factory Anomaly.fromJson(Map<String, dynamic> json) {
     return Anomaly(
       id: json['id'] as String,
-      regionId: json['region_id'] as String,
+      polygonId: json['anon_polygon_id'] as String,
       startDate: DateTime.parse(json['start_date'] as String),
-      endDate: json['end_date'] != null
-          ? DateTime.parse(json['end_date'] as String)
-          : null,
-      type: AnomalyType.values.firstWhere(
-        (t) => t.name == json['type'],
-        orElse: () => AnomalyType.unknown,
-      ),
-      severity: AnomalySeverity.values.firstWhere(
+      endDate: DateTime.parse(json['end_date'] as String),
+      severity: NdviStatus.values.firstWhere(
         (s) => s.name == json['severity'],
-        orElse: () => AnomalySeverity.medium,
+        orElse: () => NdviStatus.suppression,
       ),
+      minZScore: (json['min_z_score'] as num).toDouble(),
       deviation: (json['deviation'] as num).toDouble(),
       explanation: json['explanation'] as String? ?? '',
     );
@@ -48,11 +47,11 @@ class Anomaly {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'region_id': regionId,
+        'anon_polygon_id': polygonId,
         'start_date': startDate.toIso8601String(),
-        'end_date': endDate?.toIso8601String(),
-        'type': type.name,
+        'end_date': endDate.toIso8601String(),
         'severity': severity.name,
+        'min_z_score': minZScore,
         'deviation': deviation,
         'explanation': explanation,
       };

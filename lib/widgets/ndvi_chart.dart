@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/ndvi_point.dart';
+import '../utils/ndvi_style.dart';
 
-/// Line chart of actual NDVI against the climate-norm band (mean +/- std),
-/// with anomalous points highlighted in red.
+/// Line chart of the plotted NDVI value (`value` — real observation, or the
+/// gap-filled estimate where none exists) against the climate-norm band
+/// (mean +/- std). Observed points are solid dots; gap-filled/restored
+/// points are hollow rings, so the "исходный vs восстановленный ряд" the
+/// spec asks for is visually explicit. Points are coloured by their
+/// Z-score band (normal/suppression/critical).
 class NdviChart extends StatelessWidget {
   const NdviChart({super.key, required this.points});
 
@@ -17,17 +22,17 @@ class NdviChart extends StatelessWidget {
       return const Center(child: Text('Нет данных за выбранный период'));
     }
 
-    final actualSpots = <FlSpot>[];
+    final valueSpots = <FlSpot>[];
     final normSpots = <FlSpot>[];
     final upperSpots = <FlSpot>[];
     final lowerSpots = <FlSpot>[];
 
     for (int i = 0; i < points.length; i++) {
       final p = points[i];
-      actualSpots.add(FlSpot(i.toDouble(), p.ndvi));
-      normSpots.add(FlSpot(i.toDouble(), p.normMean));
-      upperSpots.add(FlSpot(i.toDouble(), p.normMean + p.normStd));
-      lowerSpots.add(FlSpot(i.toDouble(), p.normMean - p.normStd));
+      valueSpots.add(FlSpot(i.toDouble(), p.value));
+      normSpots.add(FlSpot(i.toDouble(), p.climatologyMean));
+      upperSpots.add(FlSpot(i.toDouble(), p.climatologyMean + p.climatologyStd));
+      lowerSpots.add(FlSpot(i.toDouble(), p.climatologyMean - p.climatologyStd));
     }
 
     return LineChart(
@@ -75,8 +80,10 @@ class NdviChart extends StatelessWidget {
               final idx = s.x.round();
               if (idx < 0 || idx >= points.length) return null;
               final p = points[idx];
+              final kind = p.isRestored ? 'восстановлено' : 'наблюдение';
               return LineTooltipItem(
-                '${DateFormat('MMM yyyy').format(p.date)}\nNDVI ${p.ndvi.toStringAsFixed(2)}',
+                '${DateFormat('MMM yyyy').format(p.date)}\n'
+                'NDVI ${p.value.toStringAsFixed(2)} ($kind)\nZ ${p.zScore.toStringAsFixed(2)}',
                 const TextStyle(color: Colors.white, fontSize: 11),
               );
             }).toList(),
@@ -113,19 +120,29 @@ class NdviChart extends StatelessWidget {
             dashArray: [6, 4],
             dotData: const FlDotData(show: false),
           ),
-          // Actual NDVI, coloured red on anomalous points.
+          // Plotted NDVI value; solid dots = real observation, hollow
+          // rings = gap-filled/restored, coloured by Z-score band.
           LineChartBarData(
-            spots: actualSpots,
+            spots: valueSpots,
             isCurved: true,
             color: const Color(0xFF2E7D32),
-            barWidth: 3,
+            barWidth: 2,
             dotData: FlDotData(
               show: true,
               getDotPainter: (spot, percent, bar, index) {
-                final anomalous = points[index].isAnomalous;
+                final p = points[index];
+                final color = statusColor(p.status);
+                if (p.isRestored) {
+                  return FlDotCirclePainter(
+                    radius: 3.5,
+                    color: Colors.white,
+                    strokeWidth: 2,
+                    strokeColor: color,
+                  );
+                }
                 return FlDotCirclePainter(
-                  radius: anomalous ? 4.5 : 2.5,
-                  color: anomalous ? const Color(0xFFB3261E) : bar.color!,
+                  radius: p.status == NdviStatus.normal ? 2.5 : 4,
+                  color: color,
                   strokeWidth: 0,
                 );
               },

@@ -1,18 +1,20 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
+import '../models/demo_area.dart';
 import '../models/ndvi_point.dart';
-import '../models/region.dart';
+import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
 
-/// Talks to the real FastAPI backend once it's available. Matches the
-/// contract agreed with the backend/ML team:
-///   GET {baseUrl}/regions
-///   GET {baseUrl}/timeseries/{region}
-///   GET {baseUrl}/anomalies?region={region}
-///   GET {baseUrl}/tiles/{z}/{x}/{y}.png?date=YYYY-MM-DD
+/// Talks to the real backend once it's available. Matches the contract in
+/// [VegetationDataService]:
+///   GET  {baseUrl}/polygons
+///   POST {baseUrl}/polygons/custom
+///   GET  {baseUrl}/timeseries/{anon_polygon_id}
+///   GET  {baseUrl}/anomalies?polygon_id={id}
 class HttpVegetationDataService implements VegetationDataService {
   HttpVegetationDataService({required this.baseUrl, http.Client? client})
       : _client = client ?? http.Client();
@@ -24,16 +26,34 @@ class HttpVegetationDataService implements VegetationDataService {
       Uri.parse('$baseUrl$path').replace(queryParameters: query);
 
   @override
-  Future<List<Region>> getRegions() async {
-    final res = await _client.get(_uri('/regions'));
+  List<DemoArea> getDemoAreas() => const [];
+
+  @override
+  Future<List<NdviPolygon>> getPolygons() async {
+    final res = await _client.get(_uri('/polygons'));
     _checkOk(res);
     final list = jsonDecode(res.body) as List;
-    return list.map((e) => Region.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => NdviPolygon.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
-  Future<List<NdviPoint>> getTimeseries(String regionId) async {
-    final res = await _client.get(_uri('/timeseries/$regionId'));
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points) async {
+    final res = await _client.post(
+      _uri('/polygons/custom'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'points': points.map((p) => [p.latitude, p.longitude]).toList(),
+      }),
+    );
+    _checkOk(res);
+    return NdviPolygon.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<NdviPoint>> getTimeseries(String polygonId) async {
+    final res = await _client.get(_uri('/timeseries/$polygonId'));
     _checkOk(res);
     final list = jsonDecode(res.body) as List;
     return list
@@ -42,20 +62,13 @@ class HttpVegetationDataService implements VegetationDataService {
   }
 
   @override
-  Future<List<Anomaly>> getAnomalies({String? regionId}) async {
+  Future<List<Anomaly>> getAnomalies({String? polygonId}) async {
     final res = await _client.get(
-      _uri('/anomalies', regionId != null ? {'region': regionId} : null),
+      _uri('/anomalies', polygonId != null ? {'polygon_id': polygonId} : null),
     );
     _checkOk(res);
     final list = jsonDecode(res.body) as List;
     return list.map((e) => Anomaly.fromJson(e as Map<String, dynamic>)).toList();
-  }
-
-  @override
-  String tileUrlTemplate(DateTime date) {
-    final dateStr =
-        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    return '$baseUrl/tiles/{z}/{x}/{y}.png?date=$dateStr';
   }
 
   void _checkOk(http.Response res) {
