@@ -45,6 +45,9 @@ dependencies:
   # HTTP client for the future real backend integration
   http: ^1.2.2
   intl: ^0.19.0
+  # Clean path-based URLs on web (no leading #)
+  flutter_web_plugins:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

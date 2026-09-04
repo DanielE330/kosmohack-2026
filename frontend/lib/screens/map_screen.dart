@@ -10,13 +10,24 @@ import '../models/ndvi_polygon.dart';
 import '../route_observer.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/about_dialog.dart';
+import '../widgets/skytime_logo.dart';
 import '../widgets/time_slider.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.service, required this.auth});
+  const MapScreen({
+    super.key,
+    required this.service,
+    required this.auth,
+    this.startDrawing = false,
+  });
 
   final VegetationDataService service;
   final AuthRepository auth;
+
+  /// Личный кабинет ведёт сразу в режим рисования (кнопка «Создать
+  /// полигон» на /account) — на самой карте отдельной кнопки «Нарисовать
+  /// полигон» больше нет.
+  final bool startDrawing;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -36,6 +47,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
 
   final MapController _mapController = MapController();
   bool _searchingRegion = false;
+  bool _consumedStartDrawing = false;
 
   @override
   void initState() {
@@ -85,6 +97,20 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         _dateIndex = dates.isEmpty ? 0 : dates.length - 1;
         _loading = false;
       });
+      // Личный кабинет ведёт сюда сразу с намерением рисовать — на самой
+      // карте отдельной кнопки «Нарисовать полигон» больше нет, поэтому
+      // включаем режим рисования один раз при первой загрузке.
+      if (widget.startDrawing && !_consumedStartDrawing) {
+        _consumedStartDrawing = true;
+        if (_needsLogin) {
+          _promptLogin();
+        } else if (mounted) {
+          setState(() {
+            _drawing = true;
+            _draftPoints.clear();
+          });
+        }
+      }
     } catch (e) {
       setState(() {
         _error = 'Не удалось загрузить данные: $e';
@@ -100,7 +126,10 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b);
   }
 
-  bool get _needsLogin => widget.service.requiresAuth && !widget.auth.isLoggedIn;
+  /// Раньше проверялось только для реального бэкенда — теперь личный
+  /// кабинет предполагает, что создавать/менять свои полигоны можно
+  /// только войдя, независимо от мока/реального API.
+  bool get _needsLogin => !widget.auth.isLoggedIn;
 
   void _promptLogin() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -111,13 +140,11 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     );
   }
 
-  void _toggleDrawing() {
-    if (_needsLogin) {
-      _promptLogin();
-      return;
-    }
+  /// Отменяет уже идущее рисование — единственный оставшийся способ
+  /// выключить `_drawing` вручную (включает его только личный кабинет).
+  void _cancelDrawing() {
     setState(() {
-      _drawing = !_drawing;
+      _drawing = false;
       _draftPoints.clear();
     });
   }
@@ -199,7 +226,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
           tooltip: 'О проекте',
           onPressed: () => showSkyTimeAboutDialog(context),
         ),
-        title: const Text('NDVI-мониторинг'),
+        title: SkyTimeLogo(height: 20, color: Theme.of(context).colorScheme.onPrimary),
         actions: [
           IconButton(
             icon: _searchingRegion
@@ -217,33 +244,24 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
             tooltip: 'Обновить',
             onPressed: _loading ? null : _load,
           ),
-          widget.auth.isLoggedIn
-              ? IconButton(
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Выйти (${widget.auth.email})',
-                  onPressed: widget.auth.logout,
-                )
-              : IconButton(
-                  icon: const Icon(Icons.login),
-                  tooltip: 'Войти',
-                  onPressed: () => context.push('/login'),
-                ),
+          IconButton(
+            icon: Icon(widget.auth.isLoggedIn ? Icons.account_circle : Icons.account_circle_outlined),
+            tooltip: widget.auth.isLoggedIn ? 'Личный кабинет (${widget.auth.email})' : 'Личный кабинет',
+            onPressed: () => context.push('/account'),
+          ),
         ],
       ),
-      floatingActionButton: _loading || _error != null
+      // Кнопки «Нарисовать полигон» на карте больше нет — режим рисования
+      // включается только из личного кабинета (/account). FAB здесь нужен
+      // только чтобы завершить/отменить уже идущее рисование.
+      floatingActionButton: (_loading || _error != null || !_drawing)
           ? null
           : FloatingActionButton.extended(
-              onPressed: _drawing
-                  ? (_draftPoints.length >= 3 ? _finishDrawing : _toggleDrawing)
-                  : _toggleDrawing,
-              icon: Icon(_drawing
-                  ? (_draftPoints.length >= 3 ? Icons.check : Icons.close)
-                  : Icons.draw_outlined),
-              label: Text(_drawing
-                  ? (_draftPoints.length >= 3
-                      ? 'Готово (${_draftPoints.length})'
-                      : 'Отменить рисование')
-                  : 'Нарисовать полигон'),
+              onPressed: _draftPoints.length >= 3 ? _finishDrawing : _cancelDrawing,
+              icon: Icon(_draftPoints.length >= 3 ? Icons.check : Icons.close),
+              label: Text(_draftPoints.length >= 3
+                  ? 'Готово (${_draftPoints.length})'
+                  : 'Отменить рисование'),
             ),
       body: _buildBody(),
     );

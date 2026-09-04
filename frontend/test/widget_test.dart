@@ -15,9 +15,9 @@ void main() {
     final polygons = await service.getPolygons();
     expect(polygons.length, 6);
     expect(polygons.map((p) => p.areaId).toSet(), {
-      'mekong-delta',
-      'paradise-ca',
-      'rondonia-br',
+      'rostov-wheat',
+      'krasnodar-sunflower',
+      'stavropol-pasture',
     });
   });
 
@@ -53,12 +53,12 @@ void main() {
   });
 
   test('a hand-drawn custom polygon gets its own time series', () async {
-    // Примерный прямоугольник рядом с демо-территорией дельты Меконга.
+    // Примерный прямоугольник рядом с демо-территорией Ростовской области.
     final polygon = await service.submitCustomPolygon(const [
-      LatLng(10.0, 105.7),
-      LatLng(10.0, 105.8),
-      LatLng(10.1, 105.8),
-      LatLng(10.1, 105.7),
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.1),
+      LatLng(47.6, 40.1),
+      LatLng(47.6, 40.0),
     ]);
 
     expect(polygon.isCustom, isTrue);
@@ -68,10 +68,10 @@ void main() {
 
   test('deleting a polygon removes it and its data', () async {
     final polygon = await service.submitCustomPolygon(const [
-      LatLng(10.0, 105.7),
-      LatLng(10.0, 105.8),
-      LatLng(10.1, 105.8),
-      LatLng(10.1, 105.7),
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.1),
+      LatLng(47.6, 40.1),
+      LatLng(47.6, 40.0),
     ]);
 
     await service.deletePolygon(polygon.id);
@@ -84,15 +84,15 @@ void main() {
 
   test('findPolygonsInRegion returns already-known polygons inside the bbox',
       () async {
-    // Дельта Меконга — оба демо-полигона в пределах ~0.05°.
+    // Ростовская область — оба демо-полигона в пределах ~0.03°.
     final found = await service.findPolygonsInRegion(
-      minLat: 9.9,
-      minLon: 105.6,
-      maxLat: 10.2,
-      maxLon: 105.9,
+      minLat: 47.4,
+      minLon: 39.9,
+      maxLat: 47.6,
+      maxLon: 40.1,
     );
     expect(found, isNotEmpty);
-    expect(found.every((p) => p.areaId == 'mekong-delta'), isTrue);
+    expect(found.every((p) => p.areaId == 'rostov-wheat'), isTrue);
   });
 
   test('findPolygonsInRegion auto-discovers contours for an empty area',
