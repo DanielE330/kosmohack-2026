@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/auth_repository.dart';
+import '../data/mock_auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.auth});
@@ -69,6 +70,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (widget.auth is MockAuthRepository) ...[
+                    Card(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Демо-доступ: ${MockAuthRepository.demoEmail} / '
+                                '${MockAuthRepository.demoPassword}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                _emailController.text = MockAuthRepository.demoEmail;
+                                _passwordController.text = MockAuthRepository.demoPassword;
+                              },
+                              child: const Text('Подставить'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,

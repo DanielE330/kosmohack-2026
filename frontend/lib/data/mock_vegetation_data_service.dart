@@ -282,7 +282,7 @@ class MockVegetationDataService implements VegetationDataService {
   Future<List<NdviPolygon>> getPolygons() async => _polygons;
 
   @override
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points) async {
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label}) async {
     _customCounter++;
     final id = 'CUSTOM-$_customCounter';
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
@@ -291,7 +291,7 @@ class MockVegetationDataService implements VegetationDataService {
 
     final polygon = NdviPolygon(
       id: id,
-      label: 'Мой полигон $_customCounter',
+      label: (label != null && label.isNotEmpty) ? label : 'Мой полигон $_customCounter',
       cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
       areaId: nearest.id,
       // Копируем список: caller (MapScreen) переиспользует и очищает свой

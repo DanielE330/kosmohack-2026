@@ -59,12 +59,13 @@ class HttpVegetationDataService implements VegetationDataService {
   }
 
   @override
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points) async {
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label}) async {
     final res = await _client.post(
       _uri('/polygons/custom'),
       headers: _authHeaders(json: true),
       body: jsonEncode({
         'points': points.map((p) => [p.latitude, p.longitude]).toList(),
+        if (label != null && label.isNotEmpty) 'label': label,
       }),
     );
     _checkOk(res);
