@@ -70,12 +70,8 @@ class _LandingScreenState extends State<LandingScreen> {
     }
   }
 
-  NdviPoint? _pointAt(String polygonId, DateTime date) {
-    final list = _timeseries[polygonId];
-    if (list == null || list.isEmpty) return null;
-    return list.reduce((a, b) =>
-        (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b);
-  }
+  NdviPoint? _pointAt(String polygonId, DateTime date) =>
+      nearestPointAt(_timeseries[polygonId], date);
 
   @override
   Widget build(BuildContext context) {

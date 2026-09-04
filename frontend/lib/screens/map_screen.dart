@@ -121,12 +121,8 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     }
   }
 
-  NdviPoint? _pointAt(String polygonId, DateTime date) {
-    final list = _timeseries[polygonId];
-    if (list == null || list.isEmpty) return null;
-    return list.reduce((a, b) =>
-        (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b);
-  }
+  NdviPoint? _pointAt(String polygonId, DateTime date) =>
+      nearestPointAt(_timeseries[polygonId], date);
 
   /// Раньше проверялось только для реального бэкенда — теперь личный
   /// кабинет предполагает, что создавать/менять свои полигоны можно
@@ -210,6 +206,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     if (_draftPoints.length < 3) return;
     final label = await _askPolygonName();
     if (label == null) return; // отменено в диалоге
+    if (!mounted) return;
     setState(() => _submittingDraft = true);
     try {
       final polygon = await widget.service.submitCustomPolygon(_draftPoints, label: label);
@@ -217,6 +214,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
       setState(() {
         _drawing = false;
         _draftPoints.clear();
+        _redoPoints.clear();
         _submittingDraft = false;
       });
       _openPolygon(polygon);
@@ -308,7 +306,9 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         autofocus: true,
         onKeyEvent: (node, event) {
           if (!_drawing || event is! KeyDownEvent) return KeyEventResult.ignored;
-          final ctrl = HardwareKeyboard.instance.isControlPressed;
+          // isMetaPressed — на Mac для undo/redo принято Cmd, а не Ctrl.
+          final ctrl = HardwareKeyboard.instance.isControlPressed ||
+              HardwareKeyboard.instance.isMetaPressed;
           if (ctrl && event.logicalKey == LogicalKeyboardKey.keyZ) {
             _undoPoint();
             return KeyEventResult.handled;
@@ -435,9 +435,10 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                 ],
               ),
               // Обязательная атрибуция тайлов Esri — как обычный текст, без
-              // кнопок и всплывающих панелей.
+              // кнопок и всплывающих панелей. Слева, а не справа — иначе
+              // перекрывалась бы с FAB рисования в том же углу.
               const Positioned(
-                right: 4,
+                left: 4,
                 bottom: 4,
                 child: IgnorePointer(
                   child: DecoratedBox(
