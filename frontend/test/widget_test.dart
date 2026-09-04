@@ -53,7 +53,7 @@ void main() {
   });
 
   test('a hand-drawn custom polygon gets its own time series', () async {
-    // Rough box near the Mekong Delta demo area.
+    // Примерный прямоугольник рядом с демо-территорией дельты Меконга.
     final polygon = await service.submitCustomPolygon(const [
       LatLng(10.0, 105.7),
       LatLng(10.0, 105.8),

@@ -27,8 +27,8 @@ class KosmohackApp extends StatelessWidget {
             if (polygon != null) {
               return PolygonDetailScreen(service: service, polygon: polygon);
             }
-            // Deep link without the polygon object (e.g. page refresh on
-            // web): fetch the polygon list and resolve it by id.
+            // Диплинк без объекта полигона (например, обновление страницы
+            // в вебе): загружаем список полигонов и находим нужный по id.
             return FutureBuilder<List<NdviPolygon>>(
               future: service.getPolygons(),
               builder: (context, snapshot) {

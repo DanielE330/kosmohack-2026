@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Slider driving the "as of" date used across the map: it selects an index
-/// into the currently loaded NDVI timeseries dates.
+/// Слайдер, задающий дату «на момент» для всей карты: выбирает индекс в
+/// загруженных датах временного ряда NDVI.
 class TimeSlider extends StatelessWidget {
   const TimeSlider({
     super.key,

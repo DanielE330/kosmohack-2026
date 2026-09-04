@@ -9,8 +9,8 @@ import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
 
-/// Talks to the real backend once it's available. Matches the contract in
-/// [VegetationDataService]:
+/// Работает с реальным бэкендом, когда он появится. Соответствует
+/// контракту в [VegetationDataService]:
 ///   GET  {baseUrl}/polygons
 ///   POST {baseUrl}/polygons/custom
 ///   GET  {baseUrl}/timeseries/{anon_polygon_id}

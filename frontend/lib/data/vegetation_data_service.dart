@@ -5,22 +5,24 @@ import '../models/demo_area.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 
-/// Contract matching the competition's actual data spec (per the task PDF):
-///   GET  /polygons                         -> open-source AOI contours (OSM/ESA WorldCereal)
-///   POST /polygons/custom {points}         -> registers a user-drawn AOI, returns its id
-///   GET  /timeseries/{anon_polygon_id}      -> `List<NdviPoint>` (primary_ndvi + gap-fill)
-///   GET  /anomalies?polygon_id={id}         -> `List<Anomaly>` (Z-score bands)
+/// Контракт, соответствующий реальной схеме данных соревнования (по ТЗ):
+///   GET  /polygons                         -> открытые контуры AOI (OSM/ESA WorldCereal)
+///   POST /polygons/custom {points}         -> регистрирует нарисованный пользователем AOI, возвращает его id
+///   GET  /timeseries/{anon_polygon_id}      -> `List<NdviPoint>` (primary_ndvi + восстановление пропусков)
+///   GET  /anomalies?polygon_id={id}         -> `List<Anomaly>` (диапазоны Z-score)
 ///
-/// The competition also requires a *separate* technical batch-inference
-/// entry point (`private_features.csv` -> `submission.csv`) — that is a
-/// backend/ML deliverable, not something this Flutter app drives.
+/// Соревнование также требует *отдельную* точку входа для технического
+/// batch-инференса (`private_features.csv` -> `submission.csv`) — это
+/// зона ответственности бэкенда/ML, не этого Flutter-приложения.
 ///
-/// [MockVegetationDataService] fakes all of this so the UI can be built and
-/// demoed before the backend is ready; [HttpVegetationDataService] talks to
-/// the real API once it's up. Swapping the implementation in main.dart is
-/// the only change needed to go from mocks to the live backend.
+/// [MockVegetationDataService] эмулирует всё это, чтобы UI можно было
+/// строить и показывать до готовности бэкенда; [HttpVegetationDataService]
+/// работает с реальным API, когда он поднимется. Замена реализации в
+/// main.dart — единственное, что нужно поменять для перехода с моков на
+/// живой бэкенд.
 abstract class VegetationDataService {
-  /// Demo-only: named places to frame the map camera and group polygons.
+  /// Только для демо: именованные точки для наведения камеры карты и
+  /// группировки полигонов.
   List<DemoArea> getDemoAreas();
 
   Future<List<NdviPolygon>> getPolygons();

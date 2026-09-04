@@ -1,6 +1,6 @@
-/// A named place used only to frame the map camera and group a handful of
-/// demo polygons for the pitch — not part of the competition's data schema
-/// (which only knows anonymous `anon_polygon_id` field polygons).
+/// Именованная точка только для наведения камеры карты и группировки
+/// нескольких демо-полигонов на питче — не часть схемы данных соревнования
+/// (там есть только анонимные полигоны с `anon_polygon_id`).
 class DemoArea {
   final String id;
   final String name;
