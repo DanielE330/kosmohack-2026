@@ -67,7 +67,7 @@ class _AccountScreenState extends State<AccountScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/map'),
         ),
         title: const Text('Личный кабинет'),
       ),
@@ -110,13 +110,13 @@ class _AccountScreenState extends State<AccountScreen> {
                       context.go('/login');
                       return;
                     }
-                    context.go('/?draw=1');
+                    context.go('/map?draw=1');
                   },
                   icon: const Icon(Icons.add_location_alt_outlined),
                   label: const Text('Создать полигон'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => context.go('/'),
+                  onPressed: () => context.go('/map'),
                   icon: const Icon(Icons.map_outlined),
                   label: const Text('Посмотреть все на карте'),
                 ),
