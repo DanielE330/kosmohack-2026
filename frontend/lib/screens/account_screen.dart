@@ -94,7 +94,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 trailing: loggedIn
                     ? TextButton(onPressed: widget.auth.logout, child: const Text('Выйти'))
                     : TextButton(
-                        onPressed: () => context.push('/login'),
+                        onPressed: () => context.go('/login'),
                         child: const Text('Войти'),
                       ),
               ),
@@ -107,7 +107,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 FilledButton.icon(
                   onPressed: () {
                     if (!widget.auth.isLoggedIn) {
-                      context.push('/login');
+                      context.go('/login');
                       return;
                     }
                     context.go('/?draw=1');
@@ -149,7 +149,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     title: Text(p.label),
                     subtitle: Text('${p.id} · ${p.cropType}'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push('/polygon/${p.id}'),
+                    onTap: () => context.go('/polygon/${p.id}'),
                   ),
                 ),
               ),

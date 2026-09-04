@@ -70,7 +70,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Чтобы изменять свои полигоны, нужно войти'),
-        action: SnackBarAction(label: 'Войти', onPressed: () => context.push('/login')),
+        action: SnackBarAction(label: 'Войти', onPressed: () => context.go('/login')),
       ),
     );
   }
