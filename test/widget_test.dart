@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'package:kosmohack_app/data/mock_vegetation_data_service.dart';
-import 'package:kosmohack_app/models/anomaly.dart';
+import 'package:kosmohack_app/models/ndvi_point.dart';
 
 void main() {
   late MockVegetationDataService service;
@@ -10,44 +11,58 @@ void main() {
     service = MockVegetationDataService();
   });
 
-  test('exposes the three demo regions used for the pitch', () async {
-    final regions = await service.getRegions();
-    expect(regions.map((r) => r.id).toSet(), {
+  test('exposes field polygons for all three demo areas', () async {
+    final polygons = await service.getPolygons();
+    expect(polygons.length, 6);
+    expect(polygons.map((p) => p.areaId).toSet(), {
       'mekong-delta',
       'paradise-ca',
       'rondonia-br',
     });
   });
 
-  test('each demo region has a 24-month NDVI timeseries', () async {
-    final regions = await service.getRegions();
-    for (final region in regions) {
-      final points = await service.getTimeseries(region.id);
-      expect(points.length, 24);
-      expect(points.every((p) => p.ndvi >= 0 && p.ndvi <= 1), isTrue);
+  test('each polygon has a ~2-year time series with some restored points',
+      () async {
+    final polygons = await service.getPolygons();
+    for (final polygon in polygons) {
+      final points = await service.getTimeseries(polygon.id);
+      expect(points.length, greaterThan(80));
+      expect(points.every((p) => p.value >= 0 && p.value <= 1), isTrue);
+      expect(points.any((p) => p.isRestored), isTrue,
+          reason: 'gap-filling must be exercised for the demo');
     }
   });
 
-  test('each demo region has at least one detected anomaly', () async {
-    final regions = await service.getRegions();
-    for (final region in regions) {
-      final anomalies = await service.getAnomalies(regionId: region.id);
+  test('each polygon has at least one detected anomaly', () async {
+    final polygons = await service.getPolygons();
+    for (final polygon in polygons) {
+      final anomalies = await service.getAnomalies(polygonId: polygon.id);
       expect(anomalies, isNotEmpty,
-          reason: '${region.id} must reliably show an anomaly for the demo');
+          reason: '${polygon.id} must reliably show an anomaly for the demo');
     }
   });
 
-  test('anomaly types match the scripted event per region', () async {
-    final fireAnomalies =
-        await service.getAnomalies(regionId: 'paradise-ca');
-    expect(fireAnomalies.first.type, AnomalyType.fire);
+  test('anomaly severities follow the spec\'s Z-score thresholds', () async {
+    final polygons = await service.getPolygons();
+    for (final polygon in polygons) {
+      final points = await service.getTimeseries(polygon.id);
+      for (final p in points) {
+        expect(p.status, ndviStatusForZ(p.zScore));
+      }
+    }
+  });
 
-    final droughtAnomalies =
-        await service.getAnomalies(regionId: 'mekong-delta');
-    expect(droughtAnomalies.first.type, AnomalyType.drought);
+  test('a hand-drawn custom polygon gets its own time series', () async {
+    // Rough box near the Mekong Delta demo area.
+    final polygon = await service.submitCustomPolygon(const [
+      LatLng(10.0, 105.7),
+      LatLng(10.0, 105.8),
+      LatLng(10.1, 105.8),
+      LatLng(10.1, 105.7),
+    ]);
 
-    final deforestationAnomalies =
-        await service.getAnomalies(regionId: 'rondonia-br');
-    expect(deforestationAnomalies.first.type, AnomalyType.deforestation);
+    expect(polygon.isCustom, isTrue);
+    final points = await service.getTimeseries(polygon.id);
+    expect(points, isNotEmpty);
   });
 }

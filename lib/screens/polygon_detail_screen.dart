@@ -4,25 +4,25 @@ import 'package:intl/intl.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
 import '../models/ndvi_point.dart';
-import '../models/region.dart';
+import '../models/ndvi_polygon.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/ndvi_chart.dart';
 
-class RegionDetailScreen extends StatefulWidget {
-  const RegionDetailScreen({
+class PolygonDetailScreen extends StatefulWidget {
+  const PolygonDetailScreen({
     super.key,
     required this.service,
-    required this.region,
+    required this.polygon,
   });
 
   final VegetationDataService service;
-  final Region region;
+  final NdviPolygon polygon;
 
   @override
-  State<RegionDetailScreen> createState() => _RegionDetailScreenState();
+  State<PolygonDetailScreen> createState() => _PolygonDetailScreenState();
 }
 
-class _RegionDetailScreenState extends State<RegionDetailScreen> {
+class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
   List<NdviPoint> _points = [];
   List<Anomaly> _anomalies = [];
   bool _loading = true;
@@ -40,9 +40,9 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
       _error = null;
     });
     try {
-      final points = await widget.service.getTimeseries(widget.region.id);
+      final points = await widget.service.getTimeseries(widget.polygon.id);
       final anomalies =
-          await widget.service.getAnomalies(regionId: widget.region.id);
+          await widget.service.getAnomalies(polygonId: widget.polygon.id);
       setState(() {
         _points = points;
         _anomalies = anomalies..sort((a, b) => b.startDate.compareTo(a.startDate));
@@ -60,7 +60,7 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.region.name),
+        title: Text(widget.polygon.label),
       ),
       body: _buildBody(),
     );
@@ -86,15 +86,17 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
       );
     }
 
+    final restoredCount = _points.where((p) => p.isRestored).length;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 720;
         final content = [
-          _RegionHeader(region: widget.region),
+          _PolygonHeader(polygon: widget.polygon, restoredCount: restoredCount, total: _points.length),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('NDVI за последние 2 года',
+            child: Text('primary_ndvi за последние 2 года',
                 style: Theme.of(context).textTheme.titleMedium),
           ),
           const SizedBox(height: 8),
@@ -103,8 +105,8 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
             child: SizedBox(height: 260, child: NdviChart(points: _points)),
           ),
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: _ChartLegend(),
           ),
         ];
@@ -164,9 +166,16 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
   }
 }
 
-class _RegionHeader extends StatelessWidget {
-  const _RegionHeader({required this.region});
-  final Region region;
+class _PolygonHeader extends StatelessWidget {
+  const _PolygonHeader({
+    required this.polygon,
+    required this.restoredCount,
+    required this.total,
+  });
+
+  final NdviPolygon polygon;
+  final int restoredCount;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
@@ -175,10 +184,23 @@ class _RegionHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${region.name}, ${region.country}',
-              style: Theme.of(context).textTheme.headlineSmall),
+          Row(
+            children: [
+              Expanded(
+                child: Text(polygon.label,
+                    style: Theme.of(context).textTheme.headlineSmall),
+              ),
+              if (polygon.isCustom)
+                const Chip(label: Text('свой полигон'), visualDensity: VisualDensity.compact),
+            ],
+          ),
           const SizedBox(height: 4),
-          Text(region.description, style: Theme.of(context).textTheme.bodyMedium),
+          Text('${polygon.id} · культура: ${polygon.cropType}',
+              style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            'Восстановлено (gap-fill) $restoredCount из $total точек ряда',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -186,15 +208,17 @@ class _RegionHeader extends StatelessWidget {
 }
 
 class _ChartLegend extends StatelessWidget {
+  const _ChartLegend();
+
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 16,
       runSpacing: 4,
       children: [
-        _dot(const Color(0xFF2E7D32), 'Фактический NDVI'),
+        _dot(const Color(0xFF2E7D32), 'Наблюдение (сплошная точка)'),
+        _hollowDot(const Color(0xFF2E7D32), 'Восстановлено (кольцо)'),
         _dot(Colors.blueGrey, 'Климатическая норма'),
-        _dot(const Color(0xFFB3261E), 'Аномальная точка'),
       ],
     );
   }
@@ -213,6 +237,25 @@ class _ChartLegend extends StatelessWidget {
       ],
     );
   }
+
+  Widget _hollowDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 11)),
+      ],
+    );
+  }
 }
 
 class _AnomaliesList extends StatelessWidget {
@@ -224,7 +267,7 @@ class _AnomaliesList extends StatelessWidget {
     if (anomalies.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(16),
-        child: Text('Аномалий за выбранный период не обнаружено.'),
+        child: Text('Аномалий (Z < −1) за выбранный период не обнаружено.'),
       );
     }
     return ListView.builder(
@@ -234,16 +277,18 @@ class _AnomaliesList extends StatelessWidget {
       itemCount: anomalies.length,
       itemBuilder: (context, i) {
         final a = anomalies[i];
-        final range = a.endDate != null
-            ? '${DateFormat('MMM yyyy').format(a.startDate)} – ${DateFormat('MMM yyyy').format(a.endDate!)}'
-            : DateFormat('MMM yyyy').format(a.startDate);
+        final range =
+            '${DateFormat('MMM yyyy').format(a.startDate)} – ${DateFormat('MMM yyyy').format(a.endDate)}';
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
-            leading: Icon(anomalyIcon(a.type), color: severityColor(a.severity)),
-            title: Text('${anomalyTypeLabel(a.type)} · ${severityLabel(a.severity)}'),
+            leading: Icon(
+              a.severity == NdviStatus.critical ? Icons.error : Icons.warning_amber_rounded,
+              color: statusColor(a.severity),
+            ),
+            title: Text(statusLabel(a.severity)),
             subtitle: Text(
-              '$range\nΔNDVI ${a.deviation.toStringAsFixed(2)}\n${a.explanation}',
+              '$range\nмин. Z ${a.minZScore.toStringAsFixed(2)} · ΔNDVI ${a.deviation.toStringAsFixed(2)}\n${a.explanation}',
             ),
             isThreeLine: true,
           ),

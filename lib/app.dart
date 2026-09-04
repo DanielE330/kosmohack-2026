@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/vegetation_data_service.dart';
-import 'models/region.dart';
+import 'models/ndvi_polygon.dart';
 import 'screens/map_screen.dart';
-import 'screens/region_detail_screen.dart';
+import 'screens/polygon_detail_screen.dart';
 
 class KosmohackApp extends StatelessWidget {
   const KosmohackApp({super.key, required this.service});
@@ -20,30 +20,30 @@ class KosmohackApp extends StatelessWidget {
           builder: (context, state) => MapScreen(service: service),
         ),
         GoRoute(
-          path: '/region/:id',
+          path: '/polygon/:id',
           builder: (context, state) {
-            final region = state.extra as Region?;
+            final polygon = state.extra as NdviPolygon?;
             final id = state.pathParameters['id']!;
-            if (region != null) {
-              return RegionDetailScreen(service: service, region: region);
+            if (polygon != null) {
+              return PolygonDetailScreen(service: service, polygon: polygon);
             }
-            // Deep link without the Region object (e.g. page refresh on
-            // web): fetch the region list and resolve it by id.
-            return FutureBuilder<List<Region>>(
-              future: service.getRegions(),
+            // Deep link without the polygon object (e.g. page refresh on
+            // web): fetch the polygon list and resolve it by id.
+            return FutureBuilder<List<NdviPolygon>>(
+              future: service.getPolygons(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Scaffold(
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
-                final found = snapshot.data!.where((r) => r.id == id);
+                final found = snapshot.data!.where((p) => p.id == id);
                 if (found.isEmpty) {
                   return const Scaffold(
-                    body: Center(child: Text('Регион не найден')),
+                    body: Center(child: Text('Полигон не найден')),
                   );
                 }
-                return RegionDetailScreen(service: service, region: found.first);
+                return PolygonDetailScreen(service: service, polygon: found.first);
               },
             );
           },

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/anomaly.dart';
+import '../models/ndvi_point.dart';
 
 /// Maps an NDVI value in [0, 1] to a colour on a red -> yellow -> green
 /// vegetation-health scale, matching the palette used on the map overlay
@@ -13,54 +13,26 @@ Color ndviColor(double ndvi) {
   return Color.lerp(const Color(0xFFE8A33D), const Color(0xFF2E7D32), (t - 0.35) / 0.65)!;
 }
 
-IconData anomalyIcon(AnomalyType type) {
-  switch (type) {
-    case AnomalyType.fire:
-      return Icons.local_fire_department;
-    case AnomalyType.drought:
-      return Icons.water_drop_outlined;
-    case AnomalyType.deforestation:
-      return Icons.forest_outlined;
-    case AnomalyType.flood:
-      return Icons.flood_outlined;
-    case AnomalyType.unknown:
-      return Icons.warning_amber_rounded;
-  }
-}
-
-String anomalyTypeLabel(AnomalyType type) {
-  switch (type) {
-    case AnomalyType.fire:
-      return 'Пожар';
-    case AnomalyType.drought:
-      return 'Засуха';
-    case AnomalyType.deforestation:
-      return 'Вырубка';
-    case AnomalyType.flood:
-      return 'Паводок';
-    case AnomalyType.unknown:
-      return 'Аномалия';
-  }
-}
-
-Color severityColor(AnomalySeverity severity) {
-  switch (severity) {
-    case AnomalySeverity.low:
-      return const Color(0xFFE8A33D);
-    case AnomalySeverity.medium:
+/// Colour/label for the three Z-score bands defined by the competition spec:
+/// Z >= -1 normal, -2 <= Z < -1 suppression, Z < -2 critical.
+Color statusColor(NdviStatus status) {
+  switch (status) {
+    case NdviStatus.normal:
+      return const Color(0xFF2E7D32);
+    case NdviStatus.suppression:
       return const Color(0xFFE8630A);
-    case AnomalySeverity.high:
+    case NdviStatus.critical:
       return const Color(0xFFB3261E);
   }
 }
 
-String severityLabel(AnomalySeverity severity) {
-  switch (severity) {
-    case AnomalySeverity.low:
-      return 'Низкая';
-    case AnomalySeverity.medium:
-      return 'Средняя';
-    case AnomalySeverity.high:
-      return 'Высокая';
+String statusLabel(NdviStatus status) {
+  switch (status) {
+    case NdviStatus.normal:
+      return 'Штатное развитие';
+    case NdviStatus.suppression:
+      return 'Угнетение биомассы';
+    case NdviStatus.critical:
+      return 'Критическая аномалия';
   }
 }
