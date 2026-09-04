@@ -1,10 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
+import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import '../theme.dart';
+import '../utils/ndvi_style.dart';
+import '../widgets/dashboard_shell.dart';
 
 /// Личный кабинет: кто вошёл, свои полигоны, быстрые действия
 /// («создать полигон», «посмотреть все на карте»). «Свои» полигоны —
@@ -23,6 +28,7 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   List<NdviPolygon> _myPolygons = [];
+  final Map<String, NdviStatus> _latestStatus = {};
   bool _loading = true;
   String? _error;
 
@@ -48,8 +54,14 @@ class _AccountScreenState extends State<AccountScreen> {
     });
     try {
       final all = await widget.service.getPolygons();
+      final mine = all.where((p) => p.isCustom).toList();
+      // Параллельно, не по одному — см. аналогичный урок в map_screen.dart.
+      final series = await Future.wait(mine.map((p) => widget.service.getTimeseries(p.id)));
+      for (var i = 0; i < mine.length; i++) {
+        if (series[i].isNotEmpty) _latestStatus[mine[i].id] = series[i].last.status;
+      }
       setState(() {
-        _myPolygons = all.where((p) => p.isCustom).toList();
+        _myPolygons = mine;
         _loading = false;
       });
     } catch (e) {
@@ -60,10 +72,38 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  /// Площадь по формуле шнурков в приближении «плоской земли» — точность
+  /// достаточна для небольших нарисованных участков (не для картографии),
+  /// метры на градус долготы взяты для широты центроида полигона.
+  double _areaHectares(NdviPolygon polygon) {
+    final points = polygon.points;
+    if (points.length < 3) return 0;
+    const metersPerDegLat = 111320.0;
+    final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+    final metersPerDegLon = metersPerDegLat * math.cos(centroidLat * math.pi / 180);
+    final xy = points.map((p) => (p.longitude * metersPerDegLon, p.latitude * metersPerDegLat)).toList();
+    double sum = 0;
+    for (var i = 0; i < xy.length; i++) {
+      final (x1, y1) = xy[i];
+      final (x2, y2) = xy[(i + 1) % xy.length];
+      sum += x1 * y2 - x2 * y1;
+    }
+    return (sum.abs() / 2) / 10000; // м² -> га
+  }
+
+  static const _accentColors = [
+    SkyTimeColors.lime,
+    SkyTimeColors.teal,
+    SkyTimeColors.violet,
+    SkyTimeColors.pink,
+  ];
+
   @override
   Widget build(BuildContext context) {
     final loggedIn = widget.auth.isLoggedIn;
-    return Scaffold(
+    return DashboardShell(
+      active: DashboardSection.account,
+      child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -148,19 +188,92 @@ class _AccountScreenState extends State<AccountScreen> {
                 child: Text('Пока нет своих полигонов — нарисуйте первый на карте.'),
               )
             else
-              ..._myPolygons.map(
-                (p) => Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: const Icon(Icons.crop_square, color: SkyTimeColors.teal),
-                    title: Text(p.label),
-                    subtitle: Text('${p.id} · ${p.cropType}'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.go('/polygon/${p.id}'),
+              for (var i = 0; i < _myPolygons.length; i++)
+                _PolygonCard(
+                  polygon: _myPolygons[i],
+                  areaHectares: _areaHectares(_myPolygons[i]),
+                  status: _latestStatus[_myPolygons[i].id],
+                  accent: _accentColors[i % _accentColors.length],
+                  onTap: () => context.go('/polygon/${_myPolygons[i].id}'),
+                ),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+/// Карточка участка по референсу макета (`style/SkyTime Map & Account.dc.html`):
+/// цветная полоска слева, площадь, статус в виде «таблетки». Цвет
+/// полоски — просто визуальный акцент по кругу цветов бренда (не несёт
+/// смысла), цвет самой таблетки статуса — настоящий Z-score-статус.
+class _PolygonCard extends StatelessWidget {
+  const _PolygonCard({
+    required this.polygon,
+    required this.areaHectares,
+    required this.status,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final NdviPolygon polygon;
+  final double areaHectares;
+  final NdviStatus? status;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveStatus = status ?? NdviStatus.normal;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(width: 4, height: 32, decoration: BoxDecoration(
+                color: accent, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 3,
+                child: Text(polygon.label,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('${areaHectares.toStringAsFixed(1)} га',
+                    style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(polygon.cropType,
+                    style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusColor(effectiveStatus).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  statusLabel(effectiveStatus),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor(effectiveStatus),
                   ),
                 ),
               ),
-          ],
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, size: 18),
+            ],
+          ),
         ),
       ),
     );
