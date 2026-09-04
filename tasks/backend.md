@@ -27,6 +27,100 @@
 - **П.0 (открытый вопрос про anon_polygon_id ↔ реальные координаты)** —
   сознательно не приоритизируем сейчас (решение команды), сам вопрос
   остаётся открытым ниже на случай, если понадобится вернуться.
+- **ML-решение от напарника смержено** (`backend/ml/`, PR #1, 2026-09-05) —
+  обученные модели восстановления пропусков + реальная интерпретация причин
+  аномалий (heat_and_drought/moisture_deficit/heat_stress/cold_stress/
+  possible_harvest/weather_or_harvest/sensor_conflict/unconfirmed). Идёт
+  подключение офлайн-части (без GEE) к `backend/app/services/gapfill.py` и
+  `anomaly_detection.py` через новый `backend/app/services/ml_bridge.py` —
+  работает на уже загруженном `data/train_dataset.csv`, деградирует на
+  прежний baseline, если ML-зависимостей/модели нет в окружении.
+- **GEE (Google Earth Engine) ещё не подключён** — нужен для двух вещей:
+  live-анализа произвольно нарисованного пользователем полигона (`/analyze`
+  в `backend/ml/webapp/main.py`) и настоящего автопоиска контуров полей по
+  ESA WorldCover (`/find-polygons`, там же). Сейчас это открытый блокер —
+  см. раздел «GEE: как получить доступ» ниже.
+
+## GEE: как получить доступ (для того, у кого американский/не-РФ аккаунт)
+
+У аккаунта из России Earth Engine регистрацию не пропускает — авторизация
+молча зацикливается обратно на выбор аккаунта Google (это ограничение на
+стороне Google, не баг у нас). Нужен кто-то с аккаунтом, не привязанным к
+России (биллинг-регион/страна аккаунта).
+
+**Шаги (займут ~10 минут):**
+
+1. Зайти на https://code.earthengine.google.com/register под нужным
+   аккаунтом → выбрать **«Unpaid usage»** (некоммерческое использование —
+   бесплатно, без карты, с квотами, которых с запасом хватит на демо).
+2. В процессе регистрации Google предложит **создать новый Google Cloud
+   проект** — можно прямо там же, отдельно ничего готовить не нужно.
+   Earth Engine API включится в этом проекте автоматически как часть
+   регистрации.
+3. Установить `earthengine-api` (Python) и запустить обычную (личную)
+   авторизацию, чтобы проверить, что всё работает:
+   ```bash
+   pip install earthengine-api
+   earthengine authenticate
+   ```
+   Откроется браузер → авторизовать → готово. Это создаёт **личные**
+   учётные данные (на своей машине) — для сервера они не подходят.
+4. **Для сервера/бэкенда нужен Service Account** (личный OAuth не переживёт
+   передачу на другую машину и не годится для Docker):
+   - Google Cloud Console → тот же проект → **IAM & Admin → Service
+     Accounts** → Create Service Account (любое имя, например
+     `kosmohack-gee`).
+   - Зарегистрировать этот service account в Earth Engine отдельно:
+     https://signup.earthengine.google.com/#!/service_accounts — вставить
+     email вида `kosmohack-gee@<project-id>.iam.gserviceaccount.com`.
+   - Создать JSON-ключ для этого service account (Service Accounts → тот
+     аккаунт → Keys → Add Key → JSON) — скачается файл, например
+     `gee-service-account.json`.
+5. Передать (не через git!) `<project-id>` и JSON-файл ключа тому, кто
+   деплоит бэкенд. На сервере это ляжет как переменные окружения в
+   `backend/ml/.env` (шаблон уже есть в `backend/ml/.env.example`):
+   ```
+   EARTHENGINE_PROJECT=<project-id>
+   GEE_SERVICE_ACCOUNT=kosmohack-gee@<project-id>.iam.gserviceaccount.com
+   GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/gee-service-account.json
+   ```
+6. Проверить одним запросом (не требует поднятого веб-сервиса):
+   ```bash
+   cd backend/ml
+   python scripts/check_gee.py --project "$EARTHENGINE_PROJECT"
+   ```
+   Успех — короткий реальный ответ по тестовому полигону из четырёх
+   источников (Sentinel-2/Landsat/MODIS/ERA5).
+
+## Что реализовать на бэке, когда GEE-доступ появится
+
+1. **Поднять `backend/ml/webapp`** как часть бэкенда — либо отдельным
+   сервисом в `docker-compose.yml` (проще всего: `uvicorn webapp.main:app`
+   в своём контейнере, порт наружу не светить, только для внутреннего
+   вызова), либо примонтировать его роуты (`/analyze`, `/find-polygons`)
+   как `APIRouter` прямо в `backend/app/main.py` — второе чище, но требует
+   свести `webapp/main.py`'s Pydantic-схемы с уже существующими в
+   `app/schemas/`.
+2. **`GET /polygons`** (`backend/app/api/routes/polygons.py`) сейчас **не
+   принимает вообще никаких query-параметров** — ни `region`, ни bbox,
+   отдаёт всю таблицу целиком. Flutter-клиент уже шлёт bbox
+   (`findPolygonsInRegion` в `vegetation_data_service.dart`) — этот
+   контракт нужно наконец реализовать по-настоящему: принять
+   `min_lat/min_lon/max_lat/max_lon`, отфильтровать по существующим
+   полигонам в БД, и если внутри области ничего нет — вызвать
+   `/find-polygons` (после п.1) для реального автопоиска через ESA
+   WorldCover вместо текущей фикции (см. `mock_...` на фронте, который
+   выдумывает 1-2 прямоугольника).
+3. **Живой анализ нарисованного пользователем полигона**: при
+   `POST /polygons/custom` (реальные координаты, не anon_polygon_id) —
+   вызывать `/analyze` (после п.1) вместо/в дополнение к обычному ORM-flow,
+   чтобы `GET /timeseries/{id}` для таких полигонов отдавал восстановленный
+   по спутнику ряд, а не пустоту.
+4. **README в корне репозитория и `infra/README.md`** — устарели, всё ещё
+   пишут «бэкенда ещё нет» / описывают только мок-фронтенд, хотя бэкенд
+   полностью готов и задеплоен на `https://skytime.daniel.crazedns.ru`.
+   Переписать с реальным способом запуска (frontend+backend+db одной
+   командой) — иначе жюри увидит фейковые данные вместо настоящих.
 
 ## 0. Открытый вопрос — решить в первую очередь
 
