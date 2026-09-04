@@ -266,6 +266,9 @@ class MockVegetationDataService implements VegetationDataService {
   }
 
   @override
+  bool get requiresAuth => false;
+
+  @override
   List<DemoArea> getDemoAreas() => _areas;
 
   @override
@@ -284,7 +287,12 @@ class MockVegetationDataService implements VegetationDataService {
       label: 'Мой полигон $_customCounter',
       cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
       areaId: nearest.id,
-      points: points,
+      // Копируем список: caller (MapScreen) переиспользует и очищает свой
+      // `_draftPoints` сразу после отправки, и если бы мы хранили ту же
+      // ссылку, у только что созданного полигона мгновенно опустел бы
+      // `points` — а `NdviPolygon.centroid` на пустом списке падает с
+      // `Bad state: No element` при следующей перерисовке карты.
+      points: List<LatLng>.from(points),
       isCustom: true,
     );
     _polygons.add(polygon);
@@ -292,6 +300,30 @@ class MockVegetationDataService implements VegetationDataService {
     _timeseries[id] = series;
     _anomalies[id] = _buildAnomalies(id, nearest.id, series);
     return polygon;
+  }
+
+  @override
+  Future<NdviPolygon> updatePolygon(
+    String polygonId, {
+    String? label,
+    String? cropType,
+    List<LatLng>? points,
+  }) async {
+    final index = _polygons.indexWhere((p) => p.id == polygonId);
+    if (index == -1) {
+      throw Exception('Полигон $polygonId не найден');
+    }
+    final current = _polygons[index];
+    final updated = NdviPolygon(
+      id: current.id,
+      label: label ?? current.label,
+      cropType: cropType ?? current.cropType,
+      areaId: current.areaId,
+      points: points ?? current.points,
+      isCustom: current.isCustom,
+    );
+    _polygons[index] = updated;
+    return updated;
   }
 
   @override

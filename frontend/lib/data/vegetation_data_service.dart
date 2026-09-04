@@ -23,12 +23,26 @@ import '../models/ndvi_polygon.dart';
 /// main.dart — единственное, что нужно поменять для перехода с моков на
 /// живой бэкенд.
 abstract class VegetationDataService {
+  /// `true` для реального бэкенда — там создание/изменение/удаление
+  /// своего полигона требует входа (JWT). Мок-демо не требует авторизации
+  /// вообще, чтобы посетитель мог сразу попробовать сервис.
+  bool get requiresAuth;
+
   /// Только для демо: именованные точки для наведения камеры карты и
   /// группировки полигонов.
   List<DemoArea> getDemoAreas();
 
   Future<List<NdviPolygon>> getPolygons();
   Future<NdviPolygon> submitCustomPolygon(List<LatLng> points);
+
+  /// Update своего полигона: любой параметр — `null`, если не меняется.
+  Future<NdviPolygon> updatePolygon(
+    String polygonId, {
+    String? label,
+    String? cropType,
+    List<LatLng>? points,
+  });
+
   Future<void> deletePolygon(String polygonId);
 
   /// Автопоиск доступных сельхозконтуров в указанном bbox — критерий
