@@ -171,10 +171,11 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     try {
       await widget.service.deletePolygon(_polygon.id);
       if (!mounted) return;
-      // Возврат назад: MapScreen сам перезапросит список полигонов после
-      // возврата (RouteObserver.didPopNext, см. map_screen.dart) —
-      // независимо от того, стрелкой в приложении или браузерной «назад».
-      context.pop();
+      // context.pop() тут не работает: у этого экрана нет стека для
+      // возврата — навигация сюда всегда идёт через context.go(), который
+      // заменяет весь стек целиком, а не пушит поверх. go('/map') всегда
+      // надёжно уводит с удалённого полигона.
+      context.go('/map');
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
