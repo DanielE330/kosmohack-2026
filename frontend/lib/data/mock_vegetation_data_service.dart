@@ -67,37 +67,14 @@ class MockVegetationDataService implements VegetationDataService {
   int _customCounter = 0;
   int _foundCounter = 0;
 
-  void _generateAll() {
-    for (final area in _areas) {
-      for (int i = 0; i < 2; i++) {
-        final polygon = _makePolygon(area, i);
-        _polygons.add(polygon);
-        final points = _generateSeries(area.id, seedOffset: i);
-        _timeseries[polygon.id] = points;
-        _anomalies[polygon.id] = _buildAnomalies(polygon.id, area.id, points);
-      }
-    }
-  }
-
-  NdviPolygon _makePolygon(DemoArea area, int index) {
-    // Небольшие прямоугольники со смещением от центра территории — заглушка
-    // вместо реальных контуров полей OSM/ESA WorldCereal.
-    final dLat = 0.01 + index * 0.018;
-    final dLon = 0.01 + index * 0.018;
-    final corners = [
-      LatLng(area.lat - dLat, area.lon - dLon),
-      LatLng(area.lat - dLat, area.lon + dLon),
-      LatLng(area.lat + dLat, area.lon + dLon),
-      LatLng(area.lat + dLat, area.lon - dLon),
-    ];
-    return NdviPolygon(
-      id: 'AOI-${area.id}-${index + 1}',
-      label: '${area.name}, участок ${index + 1}',
-      cropType: _cropTypeByArea[area.id] ?? 'unknown',
-      areaId: area.id,
-      points: corners,
-    );
-  }
+  /// Раньше здесь сразу создавались 6 демо-полигонов (по 2 на каждую из
+  /// трёх областей — Ростовская/Краснодарский/Ставропольский), чтобы
+  /// сюжет с аномалией был виден сразу без входа. Теперь карта стартует
+  /// пустой — пользователь видит только то, что реально создал сам;
+  /// список `_areas`/`_cropTypeByArea` остался как справочник координат
+  /// для подбора культуры новому нарисованному полигону (см.
+  /// `_nearestArea`), не для предзаполнения демо-данных.
+  void _generateAll() {}
 
   /// Гладкая сезонная база (без аномалии и без шума) — из неё же считается
   /// среднее/std климатической нормы.
