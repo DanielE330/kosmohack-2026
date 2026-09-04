@@ -30,10 +30,19 @@ class _MapScreenState extends State<MapScreen> {
   final List<ll.LatLng> _draftPoints = [];
   bool _submittingDraft = false;
 
+  final MapController _mapController = MapController();
+  bool _searchingRegion = false;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -81,6 +90,16 @@ class _MapScreenState extends State<MapScreen> {
     setState(() => _draftPoints.add(point));
   }
 
+  /// go_router/Navigator переиспользует уже смонтированный `MapScreen` при
+  /// возврате назад, поэтому `initState`/`_load()` повторно не вызываются —
+  /// без этого явного перезапроса список полигонов не отражал бы удаление
+  /// или добавление, случившееся на экране деталей.
+  Future<void> _openPolygon(NdviPolygon polygon) async {
+    await context.push('/polygon/${polygon.id}', extra: polygon);
+    if (!mounted) return;
+    _load();
+  }
+
   Future<void> _finishDrawing() async {
     if (_draftPoints.length < 3) return;
     setState(() => _submittingDraft = true);
@@ -92,12 +111,50 @@ class _MapScreenState extends State<MapScreen> {
         _draftPoints.clear();
         _submittingDraft = false;
       });
-      context.push('/polygon/${polygon.id}', extra: polygon);
+      _openPolygon(polygon);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submittingDraft = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Не удалось сохранить полигон: $e')),
+      );
+    }
+  }
+
+  /// Автопоиск доступных сельхозконтуров в границах текущего вида карты —
+  /// критерий «Управление полигонами» требует это отдельно от ручного
+  /// рисования (см. tasks/backend.md, GET /polygons?region=).
+  Future<void> _searchRegion() async {
+    final bounds = _mapController.camera.visibleBounds;
+    setState(() => _searchingRegion = true);
+    try {
+      final found = await widget.service.findPolygonsInRegion(
+        minLat: bounds.south,
+        minLon: bounds.west,
+        maxLat: bounds.north,
+        maxLon: bounds.east,
+      );
+      for (final p in found) {
+        _timeseries[p.id] = await widget.service.getTimeseries(p.id);
+      }
+      final knownIds = _polygons.map((p) => p.id).toSet();
+      if (!mounted) return;
+      setState(() {
+        _polygons = [..._polygons, ...found.where((p) => !knownIds.contains(p.id))];
+        _searchingRegion = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(found.isEmpty
+              ? 'В этой области контуры не найдены'
+              : 'Найдено контуров: ${found.length}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _searchingRegion = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось выполнить поиск: $e')),
       );
     }
   }
@@ -108,6 +165,17 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: const Text('NDVI-мониторинг'),
         actions: [
+          IconButton(
+            icon: _searchingRegion
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.travel_explore),
+            tooltip: 'Найти контуры полей в этой области',
+            onPressed: (_loading || _searchingRegion) ? null : _searchRegion,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Обновить',
@@ -173,6 +241,7 @@ class _MapScreenState extends State<MapScreen> {
           child: Stack(
             children: [
               FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
                   initialCenter: const ll.LatLng(10, 20),
                   initialZoom: 2.2,
@@ -216,8 +285,7 @@ class _MapScreenState extends State<MapScreen> {
                           child: _PolygonPin(
                             polygon: p,
                             status: _pointAt(p.id, selectedDate)?.status,
-                            onTap: () =>
-                                context.push('/polygon/${p.id}', extra: p),
+                            onTap: () => _openPolygon(p),
                           ),
                         ),
                       for (final pt in _draftPoints)

@@ -11,10 +11,11 @@ import 'vegetation_data_service.dart';
 
 /// Работает с реальным бэкендом, когда он появится. Соответствует
 /// контракту в [VegetationDataService]:
-///   GET  {baseUrl}/polygons
-///   POST {baseUrl}/polygons/custom
-///   GET  {baseUrl}/timeseries/{anon_polygon_id}
-///   GET  {baseUrl}/anomalies?polygon_id={id}
+///   GET    {baseUrl}/polygons?region={bbox}
+///   POST   {baseUrl}/polygons/custom
+///   DELETE {baseUrl}/polygons/{id}
+///   GET    {baseUrl}/timeseries/{anon_polygon_id}
+///   GET    {baseUrl}/anomalies?polygon_id={id}
 class HttpVegetationDataService implements VegetationDataService {
   HttpVegetationDataService({required this.baseUrl, http.Client? client})
       : _client = client ?? http.Client();
@@ -49,6 +50,29 @@ class HttpVegetationDataService implements VegetationDataService {
     );
     _checkOk(res);
     return NdviPolygon.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deletePolygon(String polygonId) async {
+    final res = await _client.delete(_uri('/polygons/$polygonId'));
+    _checkOk(res);
+  }
+
+  @override
+  Future<List<NdviPolygon>> findPolygonsInRegion({
+    required double minLat,
+    required double minLon,
+    required double maxLat,
+    required double maxLon,
+  }) async {
+    final res = await _client.get(_uri('/polygons', {
+      'region': '$minLat,$minLon,$maxLat,$maxLon',
+    }));
+    _checkOk(res);
+    final list = jsonDecode(res.body) as List;
+    return list
+        .map((e) => NdviPolygon.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
