@@ -96,7 +96,10 @@ class _LandingScreenState extends State<LandingScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _MapPreview(
-              polygons: _polygons,
+              // По умолчанию на превью видно только то, что создал сам
+              // пользователь — так живой бэкенд выглядит так же пусто,
+              // как и мок, пока не нарисован свой полигон.
+              polygons: _polygons.where((p) => p.isCustom).toList(),
               statusAt: (id) {
                 final date = _dates.isEmpty ? DateTime.now() : _dates[_dateIndex];
                 return _pointAt(id, date)?.status ?? NdviStatus.normal;

@@ -36,6 +36,13 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> with RouteAware {
   List<NdviPolygon> _polygons = [];
+  // По умолчанию на карте видно только то, что создал сам пользователь —
+  // готовые контуры соревнования (не is_custom) не должны сразу
+  // захламлять вид на живом бэкенде. "Найти контуры" — осознанное
+  // действие, поэтому найденные им полигоны тоже открываются на карте.
+  final Set<String> _revealedIds = {};
+  List<NdviPolygon> get _visiblePolygons =>
+      _polygons.where((p) => p.isCustom || _revealedIds.contains(p.id)).toList();
   final Map<String, List<NdviPoint>> _timeseries = {};
   List<DateTime> _dates = [];
   int _dateIndex = 0;
@@ -247,6 +254,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
       if (!mounted) return;
       setState(() {
         _polygons = [..._polygons, ...found.where((p) => !knownIds.contains(p.id))];
+        _revealedIds.addAll(found.map((p) => p.id));
         _searchingRegion = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -387,7 +395,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                   ),
                   PolygonLayer(
                     polygons: [
-                      for (final p in _polygons)
+                      for (final p in _visiblePolygons)
                         if (_pointAt(p.id, selectedDate) != null)
                           Polygon(
                             points: p.points,
@@ -407,7 +415,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                   ),
                   MarkerLayer(
                     markers: [
-                      for (final p in _polygons)
+                      for (final p in _visiblePolygons)
                         Marker(
                           point: p.centroid,
                           width: 44,
