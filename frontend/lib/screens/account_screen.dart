@@ -113,7 +113,14 @@ class _AccountScreenState extends State<AccountScreen> {
                     context.go('/map?draw=1');
                   },
                   icon: const Icon(Icons.add_location_alt_outlined),
-                  label: const Text('Создать полигон'),
+                  // Зачёркнуто, пока не вошли — функция доступна только
+                  // авторизованным, но кнопка кликабельна и ведёт на /login.
+                  label: Text(
+                    'Создать полигон',
+                    style: loggedIn
+                        ? null
+                        : const TextStyle(decoration: TextDecoration.lineThrough),
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => context.go('/map'),

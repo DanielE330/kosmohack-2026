@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -43,6 +44,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
 
   bool _drawing = false;
   final List<ll.LatLng> _draftPoints = [];
+  final List<ll.LatLng> _redoPoints = [];
   bool _submittingDraft = false;
 
   final MapController _mapController = MapController();
@@ -146,23 +148,71 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     setState(() {
       _drawing = false;
       _draftPoints.clear();
+      _redoPoints.clear();
     });
   }
 
   void _onMapTap(ll.LatLng point) {
     if (!_drawing) return;
-    setState(() => _draftPoints.add(point));
+    setState(() {
+      _draftPoints.add(point);
+      // Новая вершина отменяет ветку «вперёд» — как в любом стандартном
+      // undo/redo (иначе Ctrl+Y вернул бы точку, которая уже не имеет
+      // отношения к текущей форме полигона).
+      _redoPoints.clear();
+    });
+  }
+
+  void _undoPoint() {
+    if (_draftPoints.isEmpty) return;
+    setState(() => _redoPoints.add(_draftPoints.removeLast()));
+  }
+
+  void _redoPoint() {
+    if (_redoPoints.isEmpty) return;
+    setState(() => _draftPoints.add(_redoPoints.removeLast()));
   }
 
   void _openPolygon(NdviPolygon polygon) {
     context.go('/polygon/${polygon.id}');
   }
 
+  /// Спрашивает название нового полигона перед сохранением — иначе
+  /// пользователь получал бы безликое авто-имя вроде «Мой полигон N» и не
+  /// мог бы отличить свои участки друг от друга в личном кабинете.
+  Future<String?> _askPolygonName() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Название полигона'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Например, «Северное поле»'),
+          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _finishDrawing() async {
     if (_draftPoints.length < 3) return;
+    final label = await _askPolygonName();
+    if (label == null) return; // отменено в диалоге
     setState(() => _submittingDraft = true);
     try {
-      final polygon = await widget.service.submitCustomPolygon(_draftPoints);
+      final polygon = await widget.service.submitCustomPolygon(_draftPoints, label: label);
       if (!mounted) return;
       setState(() {
         _drawing = false;
@@ -251,19 +301,26 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
           ),
         ],
       ),
-      // Кнопки «Нарисовать полигон» на карте больше нет — режим рисования
-      // включается только из личного кабинета (/account). FAB здесь нужен
-      // только чтобы завершить/отменить уже идущее рисование.
-      floatingActionButton: (_loading || _error != null || !_drawing)
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _draftPoints.length >= 3 ? _finishDrawing : _cancelDrawing,
-              icon: Icon(_draftPoints.length >= 3 ? Icons.check : Icons.close),
-              label: Text(_draftPoints.length >= 3
-                  ? 'Готово (${_draftPoints.length})'
-                  : 'Отменить рисование'),
-            ),
-      body: _buildBody(),
+      // Ctrl+Z/Ctrl+Y во время рисования — отменить/вернуть последнюю
+      // поставленную точку полигона (стандартное сочетание, ожидаемое от
+      // любого рисовалки).
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (!_drawing || event is! KeyDownEvent) return KeyEventResult.ignored;
+          final ctrl = HardwareKeyboard.instance.isControlPressed;
+          if (ctrl && event.logicalKey == LogicalKeyboardKey.keyZ) {
+            _undoPoint();
+            return KeyEventResult.handled;
+          }
+          if (ctrl && event.logicalKey == LogicalKeyboardKey.keyY) {
+            _redoPoint();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -400,6 +457,23 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                   ),
                 ),
               const Positioned(left: 12, top: 12, child: _Legend()),
+              // Раньше был Scaffold.floatingActionButton — по умолчанию
+              // прилипает к нижнему краю экрана и перекрывал TimeSlider
+              // под ним. Теперь позиционируем сами, внутри области карты,
+              // так что кнопка всегда оказывается над временной шкалой,
+              // а не поверх неё.
+              if (!_loading && _error == null && _drawing)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.extended(
+                    onPressed: _draftPoints.length >= 3 ? _finishDrawing : _cancelDrawing,
+                    icon: Icon(_draftPoints.length >= 3 ? Icons.check : Icons.close),
+                    label: Text(_draftPoints.length >= 3
+                        ? 'Готово (${_draftPoints.length})'
+                        : 'Отменить рисование'),
+                  ),
+                ),
             ],
           ),
         ),

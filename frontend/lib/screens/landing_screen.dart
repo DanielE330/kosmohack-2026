@@ -10,6 +10,7 @@ import '../models/ndvi_polygon.dart';
 import '../theme.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/skytime_logo.dart';
+import '../widgets/time_slider.dart';
 
 /// Корень приложения: краткое приветствие, маленькое интерактивное окошко-
 /// превью карты (те же демо-данные, что и на /map) и пояснение того, что
@@ -28,7 +29,9 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen> {
   List<NdviPolygon> _polygons = [];
-  final Map<String, NdviStatus> _latestStatus = {};
+  final Map<String, List<NdviPoint>> _timeseries = {};
+  List<DateTime> _dates = [];
+  int _dateIndex = 0;
   bool _loading = true;
 
   @override
@@ -50,18 +53,28 @@ class _LandingScreenState extends State<LandingScreen> {
     try {
       final polygons = await widget.service.getPolygons();
       for (final p in polygons) {
-        final ts = await widget.service.getTimeseries(p.id);
-        if (ts.isNotEmpty) _latestStatus[p.id] = ts.last.status;
+        _timeseries[p.id] = await widget.service.getTimeseries(p.id);
       }
+      final dates = _timeseries.values.expand((l) => l.map((p) => p.date)).toSet().toList()
+        ..sort();
       if (!mounted) return;
       setState(() {
         _polygons = polygons;
+        _dates = dates;
+        _dateIndex = dates.isEmpty ? 0 : dates.length - 1;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  NdviPoint? _pointAt(String polygonId, DateTime date) {
+    final list = _timeseries[polygonId];
+    if (list == null || list.isEmpty) return null;
+    return list.reduce((a, b) =>
+        (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b);
   }
 
   @override
@@ -88,9 +101,14 @@ class _LandingScreenState extends State<LandingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _MapPreview(
               polygons: _polygons,
-              latestStatus: _latestStatus,
+              statusAt: (id) {
+                final date = _dates.isEmpty ? DateTime.now() : _dates[_dateIndex];
+                return _pointAt(id, date)?.status ?? NdviStatus.normal;
+              },
+              dates: _dates,
+              dateIndex: _dateIndex,
+              onDateChanged: (i) => setState(() => _dateIndex = i),
               loading: _loading,
-              onOpenMap: () => context.go('/map'),
               onOpenPolygon: (id) => context.go('/polygon/$id'),
             ),
           ),
@@ -165,16 +183,20 @@ class _Hero extends StatelessWidget {
 class _MapPreview extends StatelessWidget {
   const _MapPreview({
     required this.polygons,
-    required this.latestStatus,
+    required this.statusAt,
+    required this.dates,
+    required this.dateIndex,
+    required this.onDateChanged,
     required this.loading,
-    required this.onOpenMap,
     required this.onOpenPolygon,
   });
 
   final List<NdviPolygon> polygons;
-  final Map<String, NdviStatus> latestStatus;
+  final NdviStatus Function(String id) statusAt;
+  final List<DateTime> dates;
+  final int dateIndex;
+  final ValueChanged<int> onDateChanged;
   final bool loading;
-  final VoidCallback onOpenMap;
   final void Function(String id) onOpenPolygon;
 
   @override
@@ -185,65 +207,67 @@ class _MapPreview extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            height: 340,
             decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor)),
             child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : Stack(
+                ? const SizedBox(height: 340, child: Center(child: CircularProgressIndicator()))
+                : Column(
                     children: [
-                      FlutterMap(
-                        options: const MapOptions(
-                          // Центр — зона реального датасета (южная степная
-                          // Россия, ~47°с.ш. ~40°в.д.), а не весь мир: в
-                          // маленьком окне так сразу видно демо-полигоны.
-                          initialCenter: ll.LatLng(46.2, 40.2),
-                          initialZoom: 6.2,
-                          minZoom: 3,
-                          maxZoom: 14,
-                          interactionOptions: InteractionOptions(
-                            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-                          ),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                            userAgentPackageName: 'com.kosmohack.kosmohack_app',
-                            maxNativeZoom: 19,
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              for (final p in polygons)
-                                Marker(
-                                  point: p.centroid,
-                                  width: 36,
-                                  height: 36,
-                                  child: _PreviewPin(
-                                    status: latestStatus[p.id] ?? NdviStatus.normal,
-                                    onTap: () => onOpenPolygon(p.id),
-                                  ),
+                      SizedBox(
+                        height: 300,
+                        child: Stack(
+                          children: [
+                            FlutterMap(
+                              options: const MapOptions(
+                                // Центр — зона реального датасета (южная
+                                // степная Россия, ~47°с.ш. ~40°в.д.), а не
+                                // весь мир: в маленьком окне так сразу видно
+                                // демо-полигоны.
+                                initialCenter: ll.LatLng(46.2, 40.2),
+                                initialZoom: 6.2,
+                                minZoom: 3,
+                                maxZoom: 14,
+                                interactionOptions: InteractionOptions(
+                                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
                                 ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Positioned(
-                        right: 10,
-                        bottom: 10,
-                        child: FilledButton.tonalIcon(
-                          onPressed: onOpenMap,
-                          icon: const Icon(Icons.open_in_full, size: 16),
-                          label: const Text('На весь экран'),
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                                  userAgentPackageName: 'com.kosmohack.kosmohack_app',
+                                  maxNativeZoom: 19,
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    for (final p in polygons)
+                                      Marker(
+                                        point: p.centroid,
+                                        width: 36,
+                                        height: 36,
+                                        child: _PreviewPin(
+                                          status: statusAt(p.id),
+                                          onTap: () => onOpenPolygon(p.id),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
+                      // Та же временная шкала, что и на полной карте — по
+                      // датам видно, как менялся статус полей, прямо в
+                      // превью, без перехода на /map.
+                      TimeSlider(dates: dates, index: dateIndex, onChanged: onDateChanged),
                     ],
                   ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Превью на живых демо-данных — двигайте карту, нажимайте на метки '
-          'или откройте полную версию.',
+          'Превью на демо-данных — двигайте карту, листайте месяцы ползунком '
+          'или нажимайте на метки, чтобы открыть карточку поля.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],

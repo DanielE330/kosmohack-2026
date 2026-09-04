@@ -33,7 +33,7 @@ abstract class VegetationDataService {
   List<DemoArea> getDemoAreas();
 
   Future<List<NdviPolygon>> getPolygons();
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points);
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label});
 
   /// Update своего полигона: любой параметр — `null`, если не меняется.
   Future<NdviPolygon> updatePolygon(

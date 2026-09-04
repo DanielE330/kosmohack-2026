@@ -17,6 +17,16 @@ class MockAuthRepository extends AuthRepository {
   String? _token;
   String? _email;
 
+  /// Готовый демо-аккаунт — чтобы можно было сразу войти на моке, не
+  /// проходя регистрацию (её всё равно можно пройти отдельно, с любым
+  /// другим email).
+  static const demoEmail = 'demo@skytime.dev';
+  static const demoPassword = 'demo1234';
+
+  MockAuthRepository() {
+    _users[demoEmail] = _MockUser(email: demoEmail, password: demoPassword)..confirmed = true;
+  }
+
   @override
   String? get token => _token;
 
