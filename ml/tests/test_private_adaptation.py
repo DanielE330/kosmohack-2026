@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from private_adaptation import (  # noqa: E402
     CALIBRATION_FEATURES,
     GLOBAL_CALIBRATION_FEATURES,
+    apply_nonlinear_global_calibration,
     apply_polygon_calibration,
     apply_global_calibration,
     make_disjoint_calibration_masks,
@@ -82,6 +83,32 @@ class PrivateAdaptationTests(unittest.TestCase):
         self.assertAlmostEqual(float(result.loc[0, "global_correction_raw"]), 0.04)
         self.assertAlmostEqual(float(result.loc[0, "global_blend_weight"]), 0.65)
         self.assertAlmostEqual(float(result.loc[0, "v5_prediction"]), 0.526)
+
+    def test_nonlinear_correction_blends_ridge_and_tree(self):
+        calibration = pd.DataFrame(
+            {
+                "anon_polygon_id": ["A"] * 20,
+                "crop_type": ["зерновые"] * 20,
+                "target_true": np.linspace(0.24, 0.62, 20),
+            }
+        )
+        actual = pd.DataFrame(
+            {
+                "anon_polygon_id": ["A"],
+                "crop_type": ["зерновые"],
+                "v4_prediction": [0.50],
+            }
+        )
+        for column in GLOBAL_CALIBRATION_FEATURES:
+            calibration[column] = 0.0
+            actual[column] = 0.0
+        calibration["v3_prediction"] = calibration["target_true"] - 0.04
+        actual["v3_prediction"] = 0.50
+
+        result = apply_nonlinear_global_calibration(actual, calibration)
+        self.assertAlmostEqual(float(result.loc[0, "global_correction_raw"]), 0.04)
+        self.assertAlmostEqual(float(result.loc[0, "tree_correction_raw"]), 0.04)
+        self.assertAlmostEqual(float(result.loc[0, "v7_prediction"]), 0.536)
 
 
 if __name__ == "__main__":
