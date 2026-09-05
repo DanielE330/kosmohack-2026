@@ -14,6 +14,10 @@ class _MockUser {
   final String? fullName;
   bool confirmed = false;
   String? confirmationToken;
+  // Смена пароля — как и на реальном бэкенде, вступает в силу только
+  // после подтверждения токеном, а не сразу.
+  String? pendingPassword;
+  String? passwordChangeToken;
 }
 
 /// Эмулирует весь цикл регистрация → подтверждение → вход в памяти, без
@@ -133,12 +137,33 @@ class MockAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<void> changePassword({required String oldPassword, required String newPassword}) async {
+  Future<String> changePassword({required String oldPassword, required String newPassword}) async {
     final user = _users[_email];
     if (user == null || user.password != oldPassword) {
       throw Exception('Неверный текущий пароль');
     }
-    user.password = newPassword;
+    _tokenCounter++;
+    final token = 'mock-password-change-$_tokenCounter';
+    user.pendingPassword = newPassword;
+    user.passwordChangeToken = token;
+    return token;
+  }
+
+  @override
+  Future<void> confirmPasswordChange(String token) async {
+    _MockUser? user;
+    for (final u in _users.values) {
+      if (u.passwordChangeToken == token) {
+        user = u;
+        break;
+      }
+    }
+    if (user == null || user.pendingPassword == null) {
+      throw Exception('Неверный или уже использованный токен');
+    }
+    user.password = user.pendingPassword!;
+    user.pendingPassword = null;
+    user.passwordChangeToken = null;
   }
 
   @override

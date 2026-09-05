@@ -223,15 +223,21 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
   final _oldController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _tokenController = TextEditingController();
   bool _loading = false;
   String? _error;
   bool _success = false;
+  // Не null — пароль запрошен, ждём подтверждения токеном (см.
+  // POST /auth/change-password — вступает в силу только после
+  // /auth/confirm-password-change, как и смена почты).
+  bool _awaitingConfirmation = false;
 
   @override
   void dispose() {
     _oldController.dispose();
     _newController.dispose();
     _confirmController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
@@ -266,12 +272,41 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
       _success = false;
     });
     try {
-      await widget.auth.changePassword(oldPassword: oldPassword, newPassword: newPassword);
+      // Токен подставлен сразу в поле — та же подстраховка, что и на
+      // экране подтверждения почты, на случай если письмо не дойдёт.
+      final token = await widget.auth.changePassword(oldPassword: oldPassword, newPassword: newPassword);
+      if (!mounted) return;
+      _tokenController.text = token;
+      setState(() => _awaitingConfirmation = true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _confirm() async {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) {
+      setState(() => _error = 'Введите токен подтверждения');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await widget.auth.confirmPasswordChange(token);
       if (!mounted) return;
       _oldController.clear();
       _newController.clear();
       _confirmController.clear();
-      setState(() => _success = true);
+      _tokenController.clear();
+      setState(() {
+        _awaitingConfirmation = false;
+        _success = true;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -290,38 +325,63 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
           children: [
             Text('Сменить пароль', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 12),
-            TextField(
-              controller: _oldController,
-              decoration: const InputDecoration(labelText: 'Текущий пароль'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _newController,
-              decoration: const InputDecoration(labelText: 'Новый пароль'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _confirmController,
-              decoration: const InputDecoration(labelText: 'Повторите новый пароль'),
-              obscureText: true,
-            ),
-            if (_error != null) ...[
+            if (_awaitingConfirmation) ...[
+              const Text(
+                'Токен подтверждения также должен прийти письмом — но на '
+                'случай, если почта задержится, он уже подставлен в поле '
+                'ниже: просто нажмите «Подтвердить».',
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _tokenController,
+                decoration: const InputDecoration(labelText: 'Токен подтверждения'),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12.5)),
+              ],
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _loading ? null : _confirm,
+                child: _loading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Подтвердить'),
+              ),
+            ] else ...[
+              TextField(
+                controller: _oldController,
+                decoration: const InputDecoration(labelText: 'Текущий пароль'),
+                obscureText: true,
+              ),
               const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12.5)),
-            ],
-            if (_success) ...[
+              TextField(
+                controller: _newController,
+                decoration: const InputDecoration(labelText: 'Новый пароль'),
+                obscureText: true,
+              ),
               const SizedBox(height: 8),
-              const Text('Пароль обновлён.', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12.5)),
+              TextField(
+                controller: _confirmController,
+                decoration: const InputDecoration(labelText: 'Повторите новый пароль'),
+                obscureText: true,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12.5)),
+              ],
+              if (_success) ...[
+                const SizedBox(height: 8),
+                const Text('Пароль обновлён.', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12.5)),
+              ],
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _loading ? null : _submit,
+                child: _loading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Сменить пароль'),
+              ),
             ],
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _loading ? null : _submit,
-              child: _loading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Сменить пароль'),
-            ),
           ],
         ),
       ),

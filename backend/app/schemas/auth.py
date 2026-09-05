@@ -22,6 +22,20 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, examples=["EvenStrongerPass456"])
 
 
+class ChangePasswordResponse(BaseModel):
+    """Новый пароль не применяется сразу — только после подтверждения по
+    почте (`POST /auth/confirm-password-change`). `password_change_token`
+    отдаётся прямо в ответе тем же способом, что и `email_confirmation_token`
+    при регистрации/смене почты — подстраховка на случай, если письмо
+    задержится/не дойдёт."""
+
+    password_change_token: str
+
+
+class ConfirmPasswordChangeRequest(BaseModel):
+    token: str = Field(..., description="Токен подтверждения из /auth/change-password")
+
+
 class ChangeEmailRequest(BaseModel):
     new_email: EmailStr = Field(..., examples=["new-address@example.com"])
     password: str = Field(..., description="Текущий пароль — подтверждение, что смену запрашивает владелец")

@@ -70,17 +70,50 @@ async def test_change_password_requires_correct_old_password(client):
     )
     assert res.status_code == 401
 
+
+async def test_change_password_requires_email_confirmation_before_taking_effect(client):
+    access = await _registered_and_confirmed(client, "changepass2@example.com")
+    headers = {"Authorization": f"Bearer {access}"}
+
     res = await client.post(
         "/auth/change-password",
         json={"old_password": "StrongPass123", "new_password": "NewStrongPass456"},
         headers=headers,
     )
-    assert res.status_code == 204
+    assert res.status_code == 200
+    change_token = res.json()["password_change_token"]
 
+    # Ещё не подтверждено — старый пароль всё ещё рабочий, новый — нет.
     res = await client.post(
-        "/auth/login", json={"email": "changepass@example.com", "password": "NewStrongPass456"}
+        "/auth/login", json={"email": "changepass2@example.com", "password": "StrongPass123"}
     )
     assert res.status_code == 200
+    res = await client.post(
+        "/auth/login", json={"email": "changepass2@example.com", "password": "NewStrongPass456"}
+    )
+    assert res.status_code == 401
+
+    res = await client.post("/auth/confirm-password-change", json={"token": change_token})
+    assert res.status_code == 204
+
+    # Подтверждено — теперь наоборот.
+    res = await client.post(
+        "/auth/login", json={"email": "changepass2@example.com", "password": "NewStrongPass456"}
+    )
+    assert res.status_code == 200
+    res = await client.post(
+        "/auth/login", json={"email": "changepass2@example.com", "password": "StrongPass123"}
+    )
+    assert res.status_code == 401
+
+    # Токен одноразовый.
+    res = await client.post("/auth/confirm-password-change", json={"token": change_token})
+    assert res.status_code == 400
+
+
+async def test_confirm_password_change_with_unknown_token_is_rejected(client):
+    res = await client.post("/auth/confirm-password-change", json={"token": "does-not-exist"})
+    assert res.status_code == 400
 
 
 async def test_change_email_requires_password_and_reconfirmation(client):

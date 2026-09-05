@@ -217,17 +217,44 @@ def _collapse_by_date(records: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
     return collapsed
 
 
-def _reduce_collection(collection, geometry, scale: int, required_property: str):
+def _reduce_collection(collection, geometry, scale: int, required_property: str, reducer=None):
+    """Значения вегетационных индексов по контуру полигона — медиана по
+    пикселям внутри контура (устойчивее среднего к выбросам на границе:
+    смешанные/облачные пиксели по краю участка иначе сильно тянут оценку).
+    Полосы `*_valid_fraction` — исключение: это доля валидных пикселей
+    (0..1), медиана по бинарной маске превратилась бы в ровно 0 или 1 и
+    потеряла бы смысл как "доля" — их всегда усредняем отдельно."""
+
     def extract(image):
-        stats = image.reduceRegion(
-            reducer=ee.Reducer.mean(),
+        band_names = image.bandNames()
+        fraction_bands = band_names.filter(ee.Filter.stringContains("item", "valid_fraction"))
+        value_bands = band_names.removeAll(fraction_bands)
+
+        stats = image.select(value_bands).reduceRegion(
+            reducer=reducer or ee.Reducer.mean(),
             geometry=geometry,
             scale=scale,
             bestEffort=True,
             maxPixels=20_000_000,
             tileScale=4,
         )
-        return ee.Feature(None, stats).set("date", image.date().format("YYYY-MM-dd"))
+        fraction_stats = ee.Dictionary(
+            ee.Algorithms.If(
+                fraction_bands.size().gt(0),
+                image.select(fraction_bands).reduceRegion(
+                    reducer=ee.Reducer.mean(),
+                    geometry=geometry,
+                    scale=scale,
+                    bestEffort=True,
+                    maxPixels=20_000_000,
+                    tileScale=4,
+                ),
+                ee.Dictionary({}),
+            )
+        )
+        return ee.Feature(None, stats.combine(fraction_stats)).set(
+            "date", image.date().format("YYYY-MM-dd")
+        )
 
     return ee.FeatureCollection(collection.map(extract)).filter(
         ee.Filter.notNull([required_property])
@@ -272,7 +299,7 @@ def _sentinel_records(geometry, start: str, end_exclusive: str) -> list[dict[str
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 80))
         .map(add_indices)
     )
-    features = _reduce_collection(images, geometry, 10, "s2_ndvi")
+    features = _reduce_collection(images, geometry, 10, "s2_ndvi", reducer=ee.Reducer.median())
     return _records_from_feature_collection(features)
 
 
@@ -316,7 +343,7 @@ def _landsat_records(geometry, start: str, end_exclusive: str) -> list[dict[str,
         .filter(ee.Filter.lt("CLOUD_COVER", 90))
         .map(add_indices)
     )
-    features = _reduce_collection(images, geometry, 30, "landsat_ndvi")
+    features = _reduce_collection(images, geometry, 30, "landsat_ndvi", reducer=ee.Reducer.median())
     return _records_from_feature_collection(features)
 
 
@@ -334,7 +361,7 @@ def _modis_records(geometry, start: str, end_exclusive: str) -> list[dict[str, A
         .filterDate(start, end_exclusive)
         .map(add_indices)
     )
-    features = _reduce_collection(images, geometry, 250, "modis_ndvi")
+    features = _reduce_collection(images, geometry, 250, "modis_ndvi", reducer=ee.Reducer.median())
     return _records_from_feature_collection(features)
 
 
