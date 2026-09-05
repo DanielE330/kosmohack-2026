@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
+import '../data/reverse_geocode.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
@@ -561,6 +562,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
             polygons: _visiblePolygons,
             statusAt: (id) => _pointAt(id, selectedDate)?.status,
             onTap: (p) => _mapController.move(p.centroid, _mapController.camera.zoom),
+            onOpenStats: _openPolygon,
           ),
         TimeSlider(
           dates: _dates,
@@ -575,38 +577,43 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
 /// Горизонтальная карусель участков над временной шкалой — набор карточек
 /// свой у каждой карты (см. `mapId` в `_load()`): переключились на другую
 /// карту в сайдбаре — здесь окажутся её собственные полигоны, а не общий
-/// список. По тапу карта перецентровывается на выбранный участок — быстрый
-/// способ найти нужное поле среди многих, не выцеливая мелкую метку на карте.
+/// список; нарисовали новый полигон — карусель обновится сама вместе с
+/// `_polygons` при следующей загрузке. Один тап — карта перецентровывается
+/// на выбранный участок (быстрый способ найти поле среди многих, не
+/// выцеливая мелкую метку на карте); двойной тап — открывает карточку
+/// участка со статистикой (тот же переход, что и по метке на карте).
 class _PolygonCarousel extends StatelessWidget {
-  const _PolygonCarousel({required this.polygons, required this.statusAt, required this.onTap});
+  const _PolygonCarousel({
+    required this.polygons,
+    required this.statusAt,
+    required this.onTap,
+    required this.onOpenStats,
+  });
 
   final List<NdviPolygon> polygons;
   final NdviStatus? Function(String id) statusAt;
   final void Function(NdviPolygon) onTap;
+  final void Function(NdviPolygon) onOpenStats;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      color: Theme.of(context).colorScheme.surface,
+    return SizedBox(
+      height: 60,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: polygons.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 4),
         itemBuilder: (context, i) {
           final p = polygons[i];
           final status = statusAt(p.id) ?? NdviStatus.normal;
           return InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () => onTap(p),
+            onDoubleTap: () => onOpenStats(p),
             child: Container(
-              width: 132,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
+              width: 140,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Row(
                 children: [
                   Container(
@@ -626,12 +633,7 @@ class _PolygonCarousel extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                         ),
-                        Text(
-                          p.cropType,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10.5, color: Theme.of(context).hintColor),
-                        ),
+                        _LocationLine(polygon: p),
                       ],
                     ),
                   ),
@@ -641,6 +643,34 @@ class _PolygonCarousel extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Страна/субъект/район под названием участка — подгружаются обратным
+/// геокодированием по центроиду (см. `data/reverse_geocode.dart`), пока не
+/// пришёл ответ или если геокодирование не удалось — культура как fallback,
+/// так карточка никогда не остаётся пустой.
+class _LocationLine extends StatelessWidget {
+  const _LocationLine({required this.polygon});
+
+  final NdviPolygon polygon;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ReverseGeocodeResult>(
+      future: reverseGeocode(polygon.centroid),
+      builder: (context, snapshot) {
+        final label = (snapshot.data != null && !snapshot.data!.isEmpty)
+            ? snapshot.data!.shortLabel
+            : polygon.cropType;
+        return Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 10.5, color: Theme.of(context).hintColor),
+        );
+      },
     );
   }
 }
