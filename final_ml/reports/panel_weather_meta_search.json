@@ -1,0 +1,87 @@
+{
+  "protocol": "formula meta plus panel/weather ablation, 180 ExtraTrees",
+  "formula_only_reference_mean_rmse": 0.06614416267405945,
+  "results": [
+    {
+      "collaborative": true,
+      "weather_windows": false,
+      "numeric_features": 292,
+      "best": {
+        "mix": 0.65,
+        "blend": 1.2999999999999998,
+        "pseudo_rmse": 0.06574936826152036,
+        "validation_rmse": 0.06625499865910552,
+        "mean_rmse": 0.06600218346031295
+      },
+      "pseudo_fold_improvements": [
+        0.0013006336838785465,
+        0.0026783654990142625,
+        0.0023546064758038082,
+        0.001271397615187117
+      ],
+      "validation_fold_improvements": [
+        -5.438441566391061e-07,
+        0.001558473732029525,
+        0.0028377367436397682,
+        0.00161587077687185,
+        0.0006670103837124741
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "collaborative": false,
+      "weather_windows": true,
+      "numeric_features": 306,
+      "best": {
+        "mix": 0.65,
+        "blend": 1.2,
+        "pseudo_rmse": 0.06607805792815444,
+        "validation_rmse": 0.06635715981046839,
+        "mean_rmse": 0.06621760886931141
+      },
+      "pseudo_fold_improvements": [
+        0.00130728625332803,
+        0.0018692977381706208,
+        0.001743507079795148,
+        0.0013259360849310342
+      ],
+      "validation_fold_improvements": [
+        -0.0005324346910722116,
+        0.0017149858897030912,
+        0.0014529294357193828,
+        0.0018156823787390391,
+        0.0010673743952237108
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "collaborative": true,
+      "weather_windows": true,
+      "numeric_features": 316,
+      "best": {
+        "mix": 0.65,
+        "blend": 1.25,
+        "pseudo_rmse": 0.06588545507090139,
+        "validation_rmse": 0.06623507274025867,
+        "mean_rmse": 0.06606026390558004
+      },
+      "pseudo_fold_improvements": [
+        0.0014758394256404878,
+        0.0021796515204924385,
+        0.002068994811746841,
+        0.0012966050818511848
+      ],
+      "validation_fold_improvements": [
+        0.0006416379296460412,
+        0.0017244002633934469,
+        0.002047196840423267,
+        0.0014269737184761377,
+        0.0006174734868007598
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 5
+    }
+  ]
+}

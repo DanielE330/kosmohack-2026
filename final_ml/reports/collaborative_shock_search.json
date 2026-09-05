@@ -1,0 +1,83 @@
+{
+  "method": "per-polygon/per-source Ridge on date-by-polygon residual panel",
+  "alpha": 0.3,
+  "best": {
+    "weight": 0.14499999999999996,
+    "pseudo_rmse": 0.06673709029689649,
+    "validation_rmse": 0.06616421653385747,
+    "mean_rmse": 0.06645065341537698
+  },
+  "pseudo_v20_rmse": 0.06682137264672132,
+  "validation_v20_rmse": 0.06641684377498148,
+  "pseudo_folds": [
+    {
+      "fold": 0,
+      "rows": 1970,
+      "v20_rmse": 0.07038725772764644,
+      "candidate_rmse": 0.07019754123497304,
+      "improvement": 0.00018971649267339463
+    },
+    {
+      "fold": 1,
+      "rows": 1970,
+      "v20_rmse": 0.06208713539477364,
+      "candidate_rmse": 0.06169858301479773,
+      "improvement": 0.0003885523799759122
+    },
+    {
+      "fold": 2,
+      "rows": 1970,
+      "v20_rmse": 0.06870708599162718,
+      "candidate_rmse": 0.06880484104745209,
+      "improvement": -9.775505582490518e-05
+    },
+    {
+      "fold": 3,
+      "rows": 1970,
+      "v20_rmse": 0.06580684821627647,
+      "candidate_rmse": 0.06593057554844858,
+      "improvement": -0.0001237273321721133
+    }
+  ],
+  "validation_folds": [
+    {
+      "fold": 0,
+      "rows": 463,
+      "v20_rmse": 0.06476548876638825,
+      "candidate_rmse": 0.06469980366423132,
+      "improvement": 6.568510215693157e-05
+    },
+    {
+      "fold": 1,
+      "rows": 450,
+      "v20_rmse": 0.06758449064557522,
+      "candidate_rmse": 0.06692904427012734,
+      "improvement": 0.0006554463754478712
+    },
+    {
+      "fold": 2,
+      "rows": 363,
+      "v20_rmse": 0.04823214153160418,
+      "candidate_rmse": 0.04764977792425021,
+      "improvement": 0.0005823636073539681
+    },
+    {
+      "fold": 3,
+      "rows": 460,
+      "v20_rmse": 0.06838901162609332,
+      "candidate_rmse": 0.0686279839210486,
+      "improvement": -0.00023897229495528638
+    },
+    {
+      "fold": 4,
+      "rows": 451,
+      "v20_rmse": 0.07670959113174104,
+      "candidate_rmse": 0.07635568614948435,
+      "improvement": 0.00035390498225669476
+    }
+  ],
+  "improved_pseudo_folds": 2,
+  "improved_validation_folds": 4,
+  "final_rows_with_signal": 2267,
+  "final_signal_std": 0.03458529046248199
+}

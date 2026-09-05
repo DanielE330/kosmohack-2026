@@ -1,0 +1,23 @@
+{
+  "model": "asymmetric target-ID ExtraTrees + ID-agnostic real-gap ExtraTrees",
+  "trees_per_expert": 650,
+  "min_samples_leaf": 3,
+  "max_features": 0.7,
+  "pseudo_model_weight": 0.8,
+  "validation_model_weight": 0.19999999999999996,
+  "residual_blend": 1.05,
+  "numeric_features": 292,
+  "pseudo_oof_rmse": 0.06583732956085729,
+  "validation_oof_rmse": 0.06587992688638393,
+  "pseudo_v18_rmse": 0.06763192123624896,
+  "validation_v18_rmse": 0.06743183725290512,
+  "submission_rows": 2323,
+  "prediction_min": 0.07206696979032538,
+  "prediction_max": 0.9071328039511647,
+  "prediction_mean": 0.3900947709569536,
+  "mean_abs_v21_minus_v18": 0.010889802944991348,
+  "max_abs_v21_minus_v18": 0.12582130582576823,
+  "mean_abs_pseudo_correction": 0.01202587116808683,
+  "mean_abs_validation_correction": 0.00792833741569341,
+  "sha256": "792428724f9eb7cd8a19fcd9ce37536c3e55f19560ad9a5a4a466a75deff248c"
+}
