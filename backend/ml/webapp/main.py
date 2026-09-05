@@ -1,6 +1,15 @@
-"""FastAPI service for live vegetation monitoring with Google Earth Engine."""
+"""FastAPI service for live vegetation monitoring.
+
+Satellite/weather data comes from one of two interchangeable backends,
+selected by ``VEGMON_DATA_SOURCE`` (default ``copernicus``):
+
+- ``copernicus`` — Sentinel-2 via Copernicus Data Space (free, no billing).
+- ``gee`` — Sentinel-2/Landsat/MODIS/ERA5-Land/WorldCover via Google Earth
+  Engine, once a Cloud project is registered and billed with Earth Engine.
+"""
 from __future__ import annotations
 
+import os
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -16,9 +25,13 @@ from config import MODEL_PATH, TRAIN_PATH  # noqa: E402
 from pipeline import restore_and_analyze  # noqa: E402
 
 try:  # Works under uvicorn and when this file is run directly.
-    from . import gee_utils
+    from . import copernicus_utils, gee_utils
 except ImportError:  # pragma: no cover
+    import copernicus_utils  # type: ignore
     import gee_utils  # type: ignore
+
+DATA_SOURCE_NAME = os.getenv("VEGMON_DATA_SOURCE", "copernicus").strip().lower()
+data_source = gee_utils if DATA_SOURCE_NAME == "gee" else copernicus_utils
 
 
 app = FastAPI(title="Мониторинг вегетационной динамики", version="1.0.0")
@@ -66,15 +79,22 @@ def health():
     return {
         "status": "ok",
         "model_ready": MODEL_PATH.exists(),
-        "gee_initialized": gee_utils.is_initialized(),
+        "data_source": DATA_SOURCE_NAME,
+        "data_source_ready": data_source.is_initialized(),
     }
 
 
 @app.get("/find-polygons")
 def find_polygons(min_lon: float, min_lat: float, max_lon: float, max_lat: float):
     """Find approximate cropland contours inside a small bounding box."""
+    if not hasattr(data_source, "find_field_polygons"):
+        raise HTTPException(
+            501,
+            f"Поиск контуров полей недоступен для источника данных '{DATA_SOURCE_NAME}' "
+            "(нужен Google Earth Engine с ESA WorldCover: VEGMON_DATA_SOURCE=gee).",
+        )
     try:
-        polygons = gee_utils.find_field_polygons((min_lon, min_lat, max_lon, max_lat))
+        polygons = data_source.find_field_polygons((min_lon, min_lat, max_lon, max_lat))
         return {"polygons": polygons, "count": len(polygons)}
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -90,24 +110,24 @@ def analyze(req: PolygonRequest):
     try:
         reference = get_reference_data()
         climatology_std_floor = get_climatology_std_floor(reference, req.crop_type)
-        geometry = gee_utils.to_ee_geometry(req.geojson)
+        geometry = data_source.to_geometry(req.geojson)
         date_from = pd.Timestamp(req.date_from)
         date_to = pd.Timestamp(req.date_to)
         if date_to < date_from:
             raise ValueError("date_to не может быть раньше date_from")
 
         history_from = (date_from - pd.DateOffset(years=req.climatology_years)).date().isoformat()
-        history_records = gee_utils.get_ndvi_timeseries(
+        history_records = data_source.get_ndvi_timeseries(
             geometry, history_from, date_to.date().isoformat()
         )
-        live_records = gee_utils.prepare_live_records(
+        live_records = data_source.prepare_live_records(
             history_records,
             date_from.date().isoformat(),
             date_to.date().isoformat(),
             cadence_days=req.cadence_days,
             climatology_std_floor=climatology_std_floor,
         )
-        weather_records = gee_utils.get_era5_weather(
+        weather_records = data_source.get_era5_weather(
             geometry, date_from.date().isoformat(), date_to.date().isoformat()
         )
     except ValueError as exc:
