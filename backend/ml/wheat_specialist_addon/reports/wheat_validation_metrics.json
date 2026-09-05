@@ -1,0 +1,63 @@
+{
+  "special_crop": "озимая пшеница",
+  "rows": 13713,
+  "wheat_rows": 7146,
+  "global_oof_rmse": 0.06333449939213387,
+  "ensemble_oof_rmse": 0.06312198279227728,
+  "absolute_improvement": 0.00021251659985659088,
+  "relative_improvement_pct": 0.3355463481929493,
+  "wheat_global_rmse": 0.06960688987432545,
+  "wheat_specialist_rmse": 0.07107790690392135,
+  "wheat_ensemble_rmse": 0.06923545602742766,
+  "wheat_residual_weight": 1.0499999999999998,
+  "wheat_blend_weight": 0.30000000000000004,
+  "clip_predictions": false,
+  "accepted": true,
+  "folds": [
+    {
+      "fold": 0,
+      "rows": 2817,
+      "wheat_rows": 1629,
+      "global_rmse": 0.06575464052027684,
+      "ensemble_rmse": 0.06570796934826331,
+      "wheat_global_rmse": 0.06695498185442969,
+      "wheat_ensemble_rmse": 0.06687570233271561
+    },
+    {
+      "fold": 1,
+      "rows": 2532,
+      "wheat_rows": 972,
+      "global_rmse": 0.058347942816181435,
+      "ensemble_rmse": 0.05798172250238154,
+      "wheat_global_rmse": 0.0623023260042647,
+      "wheat_ensemble_rmse": 0.061405239995321576
+    },
+    {
+      "fold": 2,
+      "rows": 2787,
+      "wheat_rows": 1227,
+      "global_rmse": 0.06251544475328413,
+      "ensemble_rmse": 0.06209842753351126,
+      "wheat_global_rmse": 0.0742079831237913,
+      "wheat_ensemble_rmse": 0.07340837296030973
+    },
+    {
+      "fold": 3,
+      "rows": 2787,
+      "wheat_rows": 1971,
+      "global_rmse": 0.06537623713075581,
+      "ensemble_rmse": 0.06528743202896202,
+      "wheat_global_rmse": 0.07143397320678227,
+      "wheat_ensemble_rmse": 0.07131903674168255
+    },
+    {
+      "fold": 4,
+      "rows": 2790,
+      "wheat_rows": 1347,
+      "global_rmse": 0.06392920728187527,
+      "ensemble_rmse": 0.0637433516227237,
+      "wheat_global_rmse": 0.07070044445429947,
+      "wheat_ensemble_rmse": 0.07035200338916955
+    }
+  ]
+}
