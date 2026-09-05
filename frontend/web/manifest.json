@@ -1,11 +1,11 @@
 {
-    "name": "kosmohack_app",
-    "short_name": "kosmohack_app",
+    "name": "SkyTime",
+    "short_name": "SkyTime",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "SkyTime — мониторинг вегетационной динамики сельхозполей.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
