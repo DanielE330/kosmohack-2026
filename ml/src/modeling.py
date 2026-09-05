@@ -103,8 +103,15 @@ def cross_validate(
     groups: pd.Series,
     meta: pd.DataFrame,
     seed: int = 42,
+    estimator_factory=_new_estimator,
 ) -> tuple[dict, np.ndarray]:
-    """GroupKFold: ни один полигон не попадает одновременно в train и val."""
+    """GroupKFold: ни один полигон не попадает одновременно в train и val.
+
+    ``estimator_factory(seed) -> регрессор`` позволяет подставить другой
+    алгоритм (например LightGBM) вместо HistGradientBoostingRegressor по
+    умолчанию — для алгоритмической диверсификации мультимодели, а не
+    только диверсификации по сидам/маскам.
+    """
     X = X.replace([np.inf, -np.inf], np.nan)
     baseline = meta["baseline"].astype(float).to_numpy()
     fallback = float(y.median())
@@ -115,7 +122,7 @@ def cross_validate(
 
     splitter = GroupKFold(n_splits=min(5, groups.nunique()))
     for fold, (train_idx, val_idx) in enumerate(splitter.split(X, y, groups)):
-        model = _new_estimator(seed + fold)
+        model = estimator_factory(seed + fold)
         model.fit(X.iloc[train_idx], residual_target[train_idx])
         oof_residual[val_idx] = model.predict(X.iloc[val_idx])
         raw_pred = baseline[val_idx] + oof_residual[val_idx]
@@ -162,11 +169,12 @@ def fit_bundle(
     meta: pd.DataFrame,
     metrics: dict,
     seed: int = 42,
+    estimator_factory=_new_estimator,
 ) -> dict:
     X = X.replace([np.inf, -np.inf], np.nan)
     baseline = meta["baseline"].astype(float).fillna(y.median()).to_numpy()
     residual = y.to_numpy(dtype=float) - baseline
-    model = _new_estimator(seed)
+    model = estimator_factory(seed)
     model.fit(X, residual)
     return {
         "model": model,

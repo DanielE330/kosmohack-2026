@@ -1,0 +1,13 @@
+{
+  "submission_rows": 2323,
+  "calibration_rows": 7880,
+  "members": [
+    "private_a",
+    "private_b",
+    "private_c",
+    "private_lgbm_a",
+    "private_lgbm_b"
+  ],
+  "polygons": 20,
+  "locally_adapted_polygons": 20
+}

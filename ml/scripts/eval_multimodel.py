@@ -42,6 +42,8 @@ MEMBERS = {
     "private_a": ROOT / "models/gap_model_private_a.joblib",
     "private_b": ROOT / "models/gap_model_private_b.joblib",
     "private_c": ROOT / "models/gap_model_private_c.joblib",
+    "private_lgbm_a": ROOT / "models/gap_model_private_lgbm_a.joblib",
+    "private_lgbm_b": ROOT / "models/gap_model_private_lgbm_b.joblib",
 }
 
 
