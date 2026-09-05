@@ -1,0 +1,34 @@
+{
+  "formula": "v18 + 1.10 * (v19_aggressive - v18)",
+  "meta_scale": 1.1,
+  "why": "OOF optimum is about 1.10; v19-safe leaderboard movement confirms the correction direction",
+  "domains": [
+    {
+      "domain": "final_pseudo",
+      "rows": 7880,
+      "base_rmse": 0.06763192123624896,
+      "v20_proxy_rmse": 0.06682137264672132,
+      "improvement": 0.0008105485895276432
+    },
+    {
+      "domain": "released_validation",
+      "rows": 2187,
+      "base_rmse": 0.06743183725290512,
+      "v20_proxy_rmse": 0.06641684377498148,
+      "improvement": 0.001014993477923637
+    }
+  ],
+  "leaderboard_calibration": {
+    "v18_score": 0.0779,
+    "v19_safe_score": 0.0772,
+    "v19_safe_scale": 0.6,
+    "quadratic_central_optimum_scale": 1.336,
+    "v20_central_estimated_score": 0.07692
+  },
+  "submission_rows": 2323,
+  "prediction_min": 0.07738936705670893,
+  "prediction_max": 0.911096863369781,
+  "mean_abs_v20_minus_v18": 0.007527548635907165,
+  "max_abs_v20_minus_v18": 0.08567215324869629,
+  "sha256": "7dc28d67b1574520c4289b2d1f507f33820f1b7f1ae0f7a79e5227e74ec2ebcc"
+}

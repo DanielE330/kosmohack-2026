@@ -1,0 +1,31 @@
+{
+  "formula": "mean(asymmetric-ID, leaf2-panel), fallback V20 for target span (20, 40] days",
+  "domains": [
+    {
+      "domain": "final_pseudo",
+      "rows": 7880,
+      "v18_rmse": 0.06763192123624896,
+      "v20_rmse": 0.06682137264672132,
+      "v22_rmse": 0.065436191943812,
+      "improvement_vs_v20": 0.0013851807029093138
+    },
+    {
+      "domain": "released_validation",
+      "rows": 2187,
+      "v18_rmse": 0.06743183725290512,
+      "v20_rmse": 0.06641684377498148,
+      "v22_rmse": 0.06580070330437848,
+      "improvement_vs_v20": 0.0006161404706030021
+    }
+  ],
+  "fallback_regime": "20 < target_span_days <= 40",
+  "fallback_rows_final": 102,
+  "new_model_rows_final": 2221,
+  "submission_rows": 2323,
+  "prediction_min": 0.07868818985451739,
+  "prediction_max": 0.900146193347981,
+  "prediction_mean": 0.3910504323845899,
+  "mean_abs_v22_minus_v20": 0.006083261844177413,
+  "max_abs_v22_minus_v20": 0.0765776734934458,
+  "sha256": "2dce1f0e0a15fc28e0836ee1ae1756a95a76df78b40e8bee9faa6c1392240a1e"
+}
