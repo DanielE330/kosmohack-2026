@@ -6,9 +6,9 @@
 2. детекция, объединение в периоды и интерпретация отрицательных аномалий.
 
 В архив уже включены обученные модели, OOF-метрики и актуальный кандидат
-`submission_ensemble_v5.csv` на 3 112 контрольных строк. Подтверждённый v5
-получил private RMSE `0.0683`; отдельно подготовлен leaderboard-калиброванный
-эксперимент `submission_ensemble_v6.csv`.
+`submission_ensemble_v9.csv` на 3 112 контрольных строк. Подтверждённый v9
+получил лучший private RMSE `0.0668`; отдельно подготовлен
+leaderboard-калиброванный эксперимент `submission_ensemble_v10.csv`.
 
 ## Результат валидации
 
@@ -28,10 +28,18 @@
 | v3: HGB + wheat + ExtraTrees + reweighted HGB | 0.062528 | 0.0699 |
 | v4: локальная адаптация по видимым private-точкам | 0.061877 | **0.0688** |
 | v5: v4 + глобальная private-коррекция | **0.061659 nested** | **0.0683** |
-| v6: консервативное усиление двух подтверждённых поправок | 0.061793 | эксперимент |
+| v6: консервативное усиление двух подтверждённых поправок | 0.061793 | 0.0682 |
+| v7: Ridge + нелинейная ExtraTrees private-коррекция | **0.061473 nested** | **0.0674** |
+| v8: усиление подтверждённого направления v5 → v7 | 0.061549 | **0.0670** |
+| v9: уточнённая калибровка направления v5 → v7 | 0.061862 | **0.0668** |
+| v10: оценённый минимум направления v5 → v7 | 0.062211 | эксперимент |
 
 Подробности находятся в `PRIVATE_ADAPTATION_V5_README.md` и
 `LEADERBOARD_CALIBRATION_V6_README.md`.
+Нелинейная модель v7 описана в `NONLINEAR_PRIVATE_ADAPTATION_V7_README.md`.
+Калибровка v8 описана в `LEADERBOARD_CALIBRATION_V8_README.md`.
+Калибровка v9 описана в `LEADERBOARD_CALIBRATION_V9_README.md`.
+Калибровка v10 описана в `LEADERBOARD_CALIBRATION_V10_README.md`.
 
 Подробности, фолды и готовый текст гипотезы находятся в
 `reports/ML_REPORT.md`.
@@ -47,11 +55,11 @@ pip install -r requirements.txt
 
 python src/train.py
 python src/inference.py
-python scripts/predict_ensemble_v5.py
+python scripts/predict_ensemble_v7.py
 python -m unittest discover -s tests -v
 ```
 
-После запуска v5 в корне появится `submission_ensemble_v5.csv` со строго тремя
+После запуска v7 в корне появится `submission_ensemble_v7.csv` со строго тремя
 колонками:
 
 ```text
@@ -102,7 +110,8 @@ webapp/
   gee_utils.py       рабочая интеграция с Google Earth Engine
 scripts/
   check_gee.py       проверка авторизации и реального запроса к GEE
-  predict_ensemble_v5.py  актуальный leaderboard-кандидат
+  predict_ensemble_v7.py  лучшая подтверждённая нелинейная модель
+  predict_ensemble_v8.py  leaderboard-калиброванный эксперимент
 examples/
   analyze_request.json  пример запроса к POST /analyze
 ```
@@ -210,6 +219,6 @@ Live-климатология откалибрована к train: минима�
 - тест `test_query_value_cannot_leak_into_features` подтверждает, что изменение
   скрытого target не влияет на признаки контрольной строки.
 
-Фактические private RMSE уже измерены платформой для v4 (`0.0688`) и v5
-(`0.0683`). Для новых кандидатов private RMSE неизвестен до загрузки; OOF
-остаётся оценкой, а не гарантией результата на скрытой выборке.
+Фактические private RMSE уже измерены для v4 (`0.0688`), v5 (`0.0683`), v6
+(`0.0682`), v7 (`0.0674`), v8 (`0.0670`) и v9 (`0.0668`). Для новых кандидатов
+private RMSE неизвестен до загрузки; OOF остаётся оценкой, а не гарантией.

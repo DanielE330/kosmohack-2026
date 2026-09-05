@@ -13,6 +13,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
@@ -88,6 +89,22 @@ GLOBAL_BLEND_BY_CROP = {
     "пастбища/зерновые": 0.30,
     "подсолнечник": 0.35,
 }
+
+TREE_N_ESTIMATORS = 160
+TREE_MIN_SAMPLES_LEAF = 3
+TREE_MAX_FEATURES = 0.70
+TREE_RANDOM_STATE = 42
+MAX_ABS_TREE_CORRECTION = 0.12
+
+# (global Ridge weight, global ExtraTrees weight).  These were selected on the
+# complete OOF table only after nested outer-fold checks improved all 5 folds.
+NONLINEAR_BLEND_BY_CROP = {
+    "зерновые": (0.45, 0.45),
+    "озимая пшеница": (0.30, 0.20),
+    "пастбища/зерновые": (0.15, 0.45),
+    "подсолнечник": (0.20, 0.30),
+}
+DEFAULT_NONLINEAR_BLEND = (0.30, 0.20)
 
 
 @dataclass(frozen=True)
@@ -415,6 +432,81 @@ def apply_global_calibration(
     result["v5_prediction"] = np.clip(
         result["v4_prediction"]
         + result["global_blend_weight"] * result["global_correction_raw"],
+        -1.0,
+        1.0,
+    )
+    return result
+
+
+def predict_tree_residual_correction(
+    actual: pd.DataFrame,
+    calibration: pd.DataFrame,
+) -> np.ndarray:
+    """Fit a nonlinear residual correction on visible private pseudo-gaps."""
+    if len(calibration) < MIN_CALIBRATION_ROWS:
+        return np.zeros(len(actual), dtype=float)
+
+    preprocessor = ColumnTransformer(
+        [
+            (
+                "numeric",
+                SimpleImputer(strategy="median", keep_empty_features=True),
+                GLOBAL_CALIBRATION_FEATURES,
+            ),
+            (
+                "categorical",
+                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                GLOBAL_CATEGORICAL_FEATURES,
+            ),
+        ],
+        sparse_threshold=0.0,
+    )
+    model = make_pipeline(
+        preprocessor,
+        ExtraTreesRegressor(
+            n_estimators=TREE_N_ESTIMATORS,
+            min_samples_leaf=TREE_MIN_SAMPLES_LEAF,
+            max_features=TREE_MAX_FEATURES,
+            n_jobs=-1,
+            random_state=TREE_RANDOM_STATE,
+        ),
+    )
+    target_residual = (
+        calibration["target_true"].to_numpy(dtype=float)
+        - calibration["v3_prediction"].to_numpy(dtype=float)
+    )
+    model.fit(calibration, target_residual)
+    return np.clip(
+        model.predict(actual),
+        -MAX_ABS_TREE_CORRECTION,
+        MAX_ABS_TREE_CORRECTION,
+    )
+
+
+def apply_nonlinear_global_calibration(
+    adapted: pd.DataFrame,
+    calibration: pd.DataFrame,
+) -> pd.DataFrame:
+    """Blend Ridge and ExtraTrees residual corrections on top of local v4."""
+    result = adapted.copy()
+    result["global_correction_raw"] = predict_global_residual_correction(
+        result, calibration
+    )
+    result["tree_correction_raw"] = predict_tree_residual_correction(
+        result, calibration
+    )
+    weights = result["crop_type"].map(NONLINEAR_BLEND_BY_CROP)
+    weights = weights.apply(
+        lambda value: value
+        if isinstance(value, tuple)
+        else DEFAULT_NONLINEAR_BLEND
+    )
+    result["global_blend_weight"] = weights.map(lambda value: value[0])
+    result["tree_blend_weight"] = weights.map(lambda value: value[1])
+    result["v7_prediction"] = np.clip(
+        result["v4_prediction"]
+        + result["global_blend_weight"] * result["global_correction_raw"]
+        + result["tree_blend_weight"] * result["tree_correction_raw"],
         -1.0,
         1.0,
     )
