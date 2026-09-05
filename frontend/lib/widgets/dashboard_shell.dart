@@ -4,10 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../theme.dart';
 
 /// Раздел навигации в левом сайдбаре — по референсу макета из `style/`
-/// (`SkyTime Map & Account.dc.html`). Реально работают только `map` и
-/// `account` (карта и личный кабинет уже существуют); остальные пункты
-/// показаны как задел на будущее — по нажатию просто сообщают, что раздел
-/// ещё не готов, а не ведут в никуда молча.
+/// (`SkyTime Map & Account.dc.html`).
 enum DashboardSection { map, account, analytics, notifications, reports, settings }
 
 /// Обёртка с постоянным левым сайдбаром на широких экранах (desktop-style
@@ -62,12 +59,13 @@ class _Sidebar extends StatelessWidget {
       case DashboardSection.account:
         context.go('/account');
       case DashboardSection.analytics:
+        context.go('/analytics');
       case DashboardSection.notifications:
+        context.go('/notifications');
       case DashboardSection.reports:
+        context.go('/reports');
       case DashboardSection.settings:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Этот раздел ещё не готов — скоро будет')),
-        );
+        context.go('/settings');
     }
   }
 

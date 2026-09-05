@@ -76,6 +76,36 @@ class HttpAuthRepository extends AuthRepository {
     notifyListeners();
   }
 
+  @override
+  Future<void> changePassword({required String oldPassword, required String newPassword}) async {
+    final res = await _client.post(
+      _uri('/auth/change-password'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $_token'},
+      body: jsonEncode({'old_password': oldPassword, 'new_password': newPassword}),
+    );
+    if (res.statusCode != 204) throw Exception(_extractError(res));
+  }
+
+  @override
+  Future<RegistrationResult> changeEmail({required String newEmail, required String password}) async {
+    final res = await _client.post(
+      _uri('/auth/change-email'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $_token'},
+      body: jsonEncode({'new_email': newEmail, 'password': password}),
+    );
+    if (res.statusCode != 200) throw Exception(_extractError(res));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    // Старый JWT привязан к старому email и сразу перестаёт быть валидным
+    // на сервере — разлогиниваем, пока новый адрес не подтверждён.
+    _token = null;
+    _email = null;
+    notifyListeners();
+    return RegistrationResult(
+      email: data['email'] as String,
+      confirmationToken: data['email_confirmation_token'] as String,
+    );
+  }
+
   String _extractError(http.Response res) {
     try {
       final data = jsonDecode(res.body);

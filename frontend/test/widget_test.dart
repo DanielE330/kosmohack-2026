@@ -11,10 +11,12 @@ void main() {
     service = MockVegetationDataService();
   });
 
-  test('starts with no pre-seeded polygons — only what the user creates',
+  test('starts with three non-custom demo polygons (for the landing preview), no custom ones',
       () async {
     final polygons = await service.getPolygons();
-    expect(polygons, isEmpty);
+    expect(polygons.length, 3);
+    expect(polygons.every((p) => !p.isCustom), isTrue,
+        reason: 'seeded demo polygons must not show up as "мои полигоны"');
   });
 
   test('still exposes the three reference areas for crop-type lookup', () {

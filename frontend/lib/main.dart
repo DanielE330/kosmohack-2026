@@ -9,6 +9,7 @@ import 'data/http_vegetation_data_service.dart';
 import 'data/mock_auth_repository.dart';
 import 'data/mock_vegetation_data_service.dart';
 import 'data/vegetation_data_service.dart';
+import 'theme_controller.dart';
 
 /// Передайте --dart-define=API_BASE_URL=http://host:port, чтобы направить
 /// приложение на реальный бэкенд. Без этого флага работает полностью на
@@ -32,5 +33,5 @@ void main() async {
     auth = httpAuth;
   }
 
-  runApp(KosmohackApp(service: service, auth: auth));
+  runApp(KosmohackApp(service: service, auth: auth, themeController: ThemeController()));
 }

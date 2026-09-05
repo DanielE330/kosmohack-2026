@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,6 +6,7 @@ import '../data/vegetation_data_service.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import '../theme.dart';
+import '../utils/geo.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/dashboard_shell.dart';
 
@@ -45,9 +44,19 @@ class _AccountScreenState extends State<AccountScreen> {
     super.dispose();
   }
 
-  void _onAuthChanged() => setState(() {});
+  void _onAuthChanged() => _load();
 
   Future<void> _load() async {
+    // Без входа своих полигонов не бывает (создание требует логина) —
+    // не ходим в сеть вообще, иначе список молча крутится бесконечно.
+    if (!widget.auth.isLoggedIn) {
+      setState(() {
+        _myPolygons = [];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -70,25 +79,6 @@ class _AccountScreenState extends State<AccountScreen> {
         _loading = false;
       });
     }
-  }
-
-  /// Площадь по формуле шнурков в приближении «плоской земли» — точность
-  /// достаточна для небольших нарисованных участков (не для картографии),
-  /// метры на градус долготы взяты для широты центроида полигона.
-  double _areaHectares(NdviPolygon polygon) {
-    final points = polygon.points;
-    if (points.length < 3) return 0;
-    const metersPerDegLat = 111320.0;
-    final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
-    final metersPerDegLon = metersPerDegLat * math.cos(centroidLat * math.pi / 180);
-    final xy = points.map((p) => (p.longitude * metersPerDegLon, p.latitude * metersPerDegLat)).toList();
-    double sum = 0;
-    for (var i = 0; i < xy.length; i++) {
-      final (x1, y1) = xy[i];
-      final (x2, y2) = xy[(i + 1) % xy.length];
-      sum += x1 * y2 - x2 * y1;
-    }
-    return (sum.abs() / 2) / 10000; // м² -> га
   }
 
   static const _accentColors = [
@@ -191,7 +181,7 @@ class _AccountScreenState extends State<AccountScreen> {
               for (var i = 0; i < _myPolygons.length; i++)
                 _PolygonCard(
                   polygon: _myPolygons[i],
-                  areaHectares: _areaHectares(_myPolygons[i]),
+                  areaHectares: polygonAreaHectares(_myPolygons[i]),
                   status: _latestStatus[_myPolygons[i].id],
                   accent: _accentColors[i % _accentColors.length],
                   onTap: () => context.go('/polygon/${_myPolygons[i].id}'),
