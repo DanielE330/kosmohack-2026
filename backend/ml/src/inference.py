@@ -15,6 +15,13 @@ from config import (
 )
 from modeling import predict_private_gaps
 
+# Платформа реально требует эту колонку (проверено на submission_ensemble_v9,
+# который команда уже успешно проверила) — в самом тексте ТЗ написано
+# "primary_ndvi_pred" (см. страницу "ФОРМАТ SUBMISSION.CSV"), но платформа на
+# практике ждёт "primary_ndvi_true". Внутри модуля используется прежнее имя
+# ("предсказание", не "истина") — переименование только на границе экспорта.
+PLATFORM_TARGET_COL = "primary_ndvi_true"
+
 
 def main() -> None:
     if not MODEL_PATH.exists():
@@ -30,15 +37,16 @@ def main() -> None:
     expected_rows = int(private[GAP_FLAG_COL].sum())
     bundle = joblib.load(MODEL_PATH)
     submission = predict_private_gaps(private, bundle, reference=train)
+    submission = submission.rename(columns={"primary_ndvi_pred": PLATFORM_TARGET_COL})
 
     assert len(submission) == expected_rows
-    assert submission["primary_ndvi_pred"].notna().all()
+    assert submission[PLATFORM_TARGET_COL].notna().all()
     assert not submission.duplicated([ID_COL, DATE_COL]).any()
-    assert list(submission.columns) == [ID_COL, DATE_COL, "primary_ndvi_pred"]
+    assert list(submission.columns) == [ID_COL, DATE_COL, PLATFORM_TARGET_COL]
 
     submission.to_csv(SUBMISSION_PATH, index=False, encoding="utf-8")
     print(f"submission.csv: {SUBMISSION_PATH} ({len(submission):,} строк)")
-    print(submission["primary_ndvi_pred"].describe().to_string())
+    print(submission[PLATFORM_TARGET_COL].describe().to_string())
 
 
 if __name__ == "__main__":
