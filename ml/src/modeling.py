@@ -104,6 +104,7 @@ def cross_validate(
     meta: pd.DataFrame,
     seed: int = 42,
     estimator_factory=_new_estimator,
+    sample_weight: np.ndarray | None = None,
 ) -> tuple[dict, np.ndarray]:
     """GroupKFold: ни один полигон не попадает одновременно в train и val.
 
@@ -111,6 +112,12 @@ def cross_validate(
     алгоритм (например LightGBM) вместо HistGradientBoostingRegressor по
     умолчанию — для алгоритмической диверсификации мультимодели, а не
     только диверсификации по сидам/маскам.
+
+    ``sample_weight`` — веса обучающих строк той же длины, что ``X``.
+    Нужны, когда распределение синтетических пропусков (по ширине) не
+    совпадает с распределением реальных — см.
+    ``scripts/train_with_private_visible.py`` (реальные пропуски в
+    большинстве однодневные, синтетические заметно шире).
     """
     X = X.replace([np.inf, -np.inf], np.nan)
     baseline = meta["baseline"].astype(float).to_numpy()
@@ -119,11 +126,13 @@ def cross_validate(
     residual_target = y.to_numpy(dtype=float) - baseline
     oof_residual = np.zeros(len(X), dtype=float)
     fold_metrics: list[dict] = []
+    weights = None if sample_weight is None else np.asarray(sample_weight, dtype=float)
 
     splitter = GroupKFold(n_splits=min(5, groups.nunique()))
     for fold, (train_idx, val_idx) in enumerate(splitter.split(X, y, groups)):
         model = estimator_factory(seed + fold)
-        model.fit(X.iloc[train_idx], residual_target[train_idx])
+        fit_weight = None if weights is None else weights[train_idx]
+        model.fit(X.iloc[train_idx], residual_target[train_idx], sample_weight=fit_weight)
         oof_residual[val_idx] = model.predict(X.iloc[val_idx])
         raw_pred = baseline[val_idx] + oof_residual[val_idx]
         fold_metrics.append(
@@ -170,12 +179,13 @@ def fit_bundle(
     metrics: dict,
     seed: int = 42,
     estimator_factory=_new_estimator,
+    sample_weight: np.ndarray | None = None,
 ) -> dict:
     X = X.replace([np.inf, -np.inf], np.nan)
     baseline = meta["baseline"].astype(float).fillna(y.median()).to_numpy()
     residual = y.to_numpy(dtype=float) - baseline
     model = estimator_factory(seed)
-    model.fit(X, residual)
+    model.fit(X, residual, sample_weight=sample_weight)
     return {
         "model": model,
         "feature_columns": list(X.columns),

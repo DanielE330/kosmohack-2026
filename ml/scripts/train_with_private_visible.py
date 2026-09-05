@@ -26,6 +26,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from config import (  # noqa: E402
     DATE_COL,
+    GAP_FLAG_COL,
+    ID_COL,
     RANDOM_SEED,
     SYNTHETIC_MASK_RATE,
     SYNTHETIC_SEEDS,
@@ -37,6 +39,56 @@ from modeling import build_training_samples, cross_validate, fit_bundle, save_bu
 from private_adaptation import make_disjoint_calibration_masks  # noqa: E402
 
 OUTPUT_MODEL_PATH = ROOT / "models/gap_model_with_private.joblib"
+
+# Границы бинов ширины пропуска (сумма расстояний до соседа слева и справа,
+# в днях). Подобраны так, чтобы отделить типичный однодневный реальный
+# пропуск (span=2) от искусственно широких.
+SPAN_BINS = np.array([0, 2, 4, 7, 14, 30, np.inf])
+
+
+def real_gap_span_frequencies(private: pd.DataFrame) -> np.ndarray:
+    """Эмпирическое распределение ширины НАСТОЯЩИХ пропусков private.
+
+    Использует только флаг ``is_synthetic_gap`` (какие даты являются
+    пропуском) и даты видимых точек — то есть публичную структуру задачи,
+    не сами скрытые значения NDVI. Ничего из ground truth не используется.
+    """
+    data = private.sort_values([ID_COL, DATE_COL])
+    is_gap = data[GAP_FLAG_COL].fillna(False).astype(bool)
+    spans: list[float] = []
+    for _, group in data.groupby(ID_COL, sort=False):
+        gap_dates = group.loc[is_gap.loc[group.index], DATE_COL]
+        known_dates = group.loc[~is_gap.loc[group.index], DATE_COL]
+        if gap_dates.empty or known_dates.empty:
+            continue
+        known = known_dates.to_numpy()
+        for gap_date in gap_dates.to_numpy():
+            before = known[known < gap_date]
+            after = known[known > gap_date]
+            b = (gap_date - before.max()) / np.timedelta64(1, "D") if len(before) else np.nan
+            a = (after.min() - gap_date) / np.timedelta64(1, "D") if len(after) else np.nan
+            total = np.nansum([b, a])
+            if np.isfinite(total):
+                spans.append(float(total))
+    counts, _ = np.histogram(spans, bins=SPAN_BINS)
+    return counts / counts.sum()
+
+
+def span_reweight(span_days: pd.Series, real_freq: np.ndarray, clip: tuple[float, float] = (0.15, 6.0)) -> np.ndarray:
+    """Веса обучающих строк, компенсирующие перекос синтетических масок
+    в сторону широких пропусков (см. докстринг модуля и SPAN_BINS)."""
+    values = span_days.fillna(SPAN_BINS[-2] + 1).to_numpy(dtype=float)
+    bin_idx = np.clip(np.digitize(values, SPAN_BINS) - 1, 0, len(real_freq) - 1)
+    synth_counts = np.bincount(bin_idx, minlength=len(real_freq)).astype(float)
+    synth_freq = synth_counts / synth_counts.sum()
+    ratio = np.divide(
+        real_freq[bin_idx],
+        synth_freq[bin_idx],
+        out=np.ones(len(bin_idx)),
+        where=synth_freq[bin_idx] > 0,
+    )
+    ratio = np.clip(ratio, *clip)
+    return ratio / ratio.mean()
 
 
 def _lightgbm_estimator(seed: int):
@@ -89,6 +141,13 @@ def parse_args() -> argparse.Namespace:
         help="алгоритм регрессора остатка (hgb по умолчанию, lightgbm — для"
         " алгоритмической диверсификации мультимодели)",
     )
+    parser.add_argument(
+        "--span-reweight",
+        action="store_true",
+        help="взвесить обучающие строки так, чтобы распределение ширины"
+        " синтетических пропусков соответствовало реальному (в private"
+        " большинство пропусков однодневные, синтетические — заметно шире)",
+    )
     return parser.parse_args()
 
 
@@ -128,6 +187,19 @@ def main() -> None:
 
     factory = ESTIMATOR_FACTORIES[args.algo]
     kwargs = {} if factory is None else {"estimator_factory": factory}
+
+    if args.span_reweight:
+        real_freq = real_gap_span_frequencies(private)
+        weights = span_reweight(X["target_span_days"], real_freq)
+        print(
+            "Взвешивание по ширине пропуска включено. Реальное "
+            f"распределение по бинам {SPAN_BINS.tolist()}: "
+            + ", ".join(f"{p:.2f}" for p in real_freq)
+        )
+        kwargs["sample_weight"] = weights
+    else:
+        weights = None
+
     metrics, _ = cross_validate(X, y, groups, meta, seed=args.model_seed, **kwargs)
     print(f"  Гибридный baseline RMSE: {metrics['baseline_rmse']:.5f}")
     print(f"  Baseline + ML RMSE:      {metrics['oof_rmse']:.5f}")
