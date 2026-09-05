@@ -295,8 +295,8 @@ def _add_date_context(features: pd.DataFrame, work: pd.DataFrame) -> None:
 
     target_stats = visible.groupby(DATE_COL)[TARGET_COL].agg(["median", "mean", "count"])
     for stat in target_stats.columns:
-        features.loc[query_dates.index, f"date_target_{stat}"] = query_dates.map(
-            target_stats[stat]
+        features.loc[query_dates.index, f"date_target_{stat}"] = (
+            query_dates.map(target_stats[stat]).astype(float)
         )
 
     crop_stats = (
@@ -315,14 +315,23 @@ def _add_date_context(features: pd.DataFrame, work: pd.DataFrame) -> None:
     for sensor in ("s2_ndvi", "landsat_ndvi", "modis_ndvi"):
         if sensor not in visible:
             continue
-        availability = visible.assign(_available=visible[sensor].notna()).groupby(DATE_COL)[
-            "_available"
-        ].mean()
-        medians = visible.groupby(DATE_COL)[sensor].median()
-        features.loc[query_dates.index, f"date_{sensor}_availability"] = query_dates.map(
-            availability
+        # Колонка датчика может целиком состоять из None (объект ещё не видел
+        # ни одного значения этого датчика) — тогда pandas хранит её как
+        # dtype "object", а не "float64". .astype(float) на РЕЗУЛЬТАТЕ .map()
+        # ниже страхует от LossySetitemError при записи такой NaN-серии в
+        # предзаполненный float64-столбец features (воспроизводится под
+        # pandas>=3, не только в этом крайнем случае all-None).
+        sensor_values = pd.to_numeric(visible[sensor], errors="coerce")
+        availability = (
+            sensor_values.notna().groupby(visible[DATE_COL]).mean()
         )
-        features.loc[query_dates.index, f"date_{sensor}_median"] = query_dates.map(medians)
+        medians = sensor_values.groupby(visible[DATE_COL]).median()
+        features.loc[query_dates.index, f"date_{sensor}_availability"] = (
+            query_dates.map(availability).astype(float)
+        )
+        features.loc[query_dates.index, f"date_{sensor}_median"] = (
+            query_dates.map(medians).astype(float)
+        )
 
 
 def _neighbor_feature_names(prefix: str, depth: int) -> list[str]:

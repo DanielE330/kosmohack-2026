@@ -89,6 +89,19 @@ def _observations_frame(observations: list) -> Any:
     df["date"] = pd.to_datetime(df["date"])
     df["year"] = df["date"].dt.year.astype(float)
     df["is_synthetic_gap"] = df["primary_ndvi"].isna()
+
+    # Колонка, где значение отсутствует у ВСЕХ наблюдений (например датчик,
+    # для которого ещё нет данных на этот полигон), собирается из одних None
+    # и получает dtype "object", а не "float64". gap_features._add_date_context
+    # затем строит по такой колонке пустую агрегацию и пытается записать её
+    # обратно в предзаполненный float64-столбец features — под pandas>=3 это
+    # падает с LossySetitemError, и predict_primary_ndvi тихо откатывается на
+    # линейную интерполяцию при КАЖДОМ вызове, а не только в этом крайнем
+    # случае. Явно приводим числовые колонки к float64 здесь же.
+    numeric_cols = ["primary_ndvi", "doy", "ndvi_climatology_mean",
+                    "ndvi_climatology_std", "n_reference_years", *_SENSOR_FIELDS]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
