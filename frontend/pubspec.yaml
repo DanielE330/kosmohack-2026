@@ -48,6 +48,7 @@ dependencies:
   # Clean path-based URLs on web (no leading #)
   flutter_web_plugins:
     sdk: flutter
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

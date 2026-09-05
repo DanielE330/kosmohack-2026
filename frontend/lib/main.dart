@@ -33,5 +33,6 @@ void main() async {
     auth = httpAuth;
   }
 
+  await auth.init();
   runApp(KosmohackApp(service: service, auth: auth, themeController: ThemeController()));
 }

@@ -61,6 +61,24 @@ class MockVegetationDataService implements VegetationDataService {
     'stavropol-pasture': 'пастбища/зерновые',
   };
 
+  /// Культуры вне трёх опорных территорий — иначе абсолютно любой полигон
+  /// в мире получал бы одну из тех же трёх культур (`_nearestArea` без
+  /// порога расстояния всегда возвращает «ближайшую из трёх», даже если
+  /// реально до неё тысячи километров) — то самое «жёсткая привязка к
+  /// одному набору территорий», прямо запрещённое критерием оценки.
+  static const _genericCropTypes = [
+    'кукуруза',
+    'соя',
+    'ячмень',
+    'рис',
+    'сахарная свёкла',
+  ];
+
+  /// В градусах — квадрат расстояния (см. `_dist`), за пределами которого
+  /// точка считается «не относящейся» ни к одной из трёх опорных
+  /// территорий. ~5° по каждой оси (примерно 500+ км).
+  static const _areaRadiusSquaredDeg = 25.0;
+
   final List<NdviPolygon> _polygons = [];
   final Map<String, List<NdviPoint>> _timeseries = {};
   final Map<String, List<Anomaly>> _anomalies = {};
@@ -301,12 +319,13 @@ class MockVegetationDataService implements VegetationDataService {
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
     final centroidLon = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
     final nearest = _nearestArea(centroidLat, centroidLon);
+    final (cropType, areaId) = _cropTypeAndAreaFor(centroidLat, centroidLon, _customCounter);
 
     final polygon = NdviPolygon(
       id: id,
       label: (label != null && label.isNotEmpty) ? label : 'Мой полигон $_customCounter',
-      cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
-      areaId: nearest.id,
+      cropType: cropType,
+      areaId: areaId,
       // Копируем список: caller (MapScreen) переиспользует и очищает свой
       // `_draftPoints` сразу после отправки, и если бы мы хранили ту же
       // ссылку, у только что созданного полигона мгновенно опустел бы
@@ -388,11 +407,12 @@ class MockVegetationDataService implements VegetationDataService {
       final sign = i == 0 ? -1 : 1;
       final cLat = centerLat + sign * dLat;
       final cLon = centerLon + sign * dLon;
+      final (cropType, areaId) = _cropTypeAndAreaFor(cLat, cLon, _foundCounter);
       final polygon = NdviPolygon(
         id: id,
         label: 'Найденный контур $_foundCounter',
-        cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
-        areaId: nearest.id,
+        cropType: cropType,
+        areaId: areaId,
         points: [
           LatLng(cLat - dLat, cLon - dLon),
           LatLng(cLat - dLat, cLon + dLon),
@@ -415,6 +435,23 @@ class MockVegetationDataService implements VegetationDataService {
       final db = _dist(b.lat, b.lon, lat, lon);
       return da < db ? a : b;
     });
+  }
+
+  /// Культура + areaId для метаданных полигона (то, что реально видно в UI):
+  /// одна из трёх реальных культур — только если точка правда рядом с одной
+  /// из опорных территорий; иначе — генерик-культура по хэшу координат
+  /// (не всегда одна и та же для разных точек), areaId пустой. Сценарий
+  /// аномалии/сезонности (`_generateSeries`/`_buildAnomalies`) всё равно
+  /// использует `nearest.id` — это внутренняя форма кривой, не то, что
+  /// видит пользователь.
+  (String cropType, String areaId) _cropTypeAndAreaFor(double lat, double lon, int seed) {
+    final nearest = _nearestArea(lat, lon);
+    final d = _dist(nearest.lat, nearest.lon, lat, lon);
+    if (d <= _areaRadiusSquaredDeg) {
+      return (_cropTypeByArea[nearest.id] ?? 'unknown', nearest.id);
+    }
+    final crop = _genericCropTypes[seed.abs() % _genericCropTypes.length];
+    return (crop, '');
   }
 
   double _dist(double lat1, double lon1, double lat2, double lon2) {

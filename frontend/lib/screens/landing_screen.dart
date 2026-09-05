@@ -231,7 +231,12 @@ class _MapPreview extends StatelessWidget {
                                 minZoom: 3,
                                 maxZoom: 14,
                                 interactionOptions: InteractionOptions(
-                                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                                  // Плюс scrollWheelZoom — раньше превью не масштабировалось
+                                  // колесом мыши на десктопе, только пальцем на тач-устройствах.
+                                  flags: InteractiveFlag.pinchZoom |
+                                      InteractiveFlag.drag |
+                                      InteractiveFlag.scrollWheelZoom |
+                                      InteractiveFlag.doubleTapZoom,
                                 ),
                               ),
                               children: [

@@ -1,4 +1,11 @@
+import 'dart:async';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'auth_repository.dart';
+
+const _kTokenKey = 'auth_token';
+const _kEmailKey = 'auth_email';
 
 class _MockUser {
   _MockUser({required this.email, required this.password, this.fullName});
@@ -33,6 +40,37 @@ class MockAuthRepository extends AuthRepository {
   @override
   String? get email => _email;
 
+  /// В моке весь `_users` живёт только в памяти и создаётся заново при
+  /// каждой перезагрузке страницы — восстановить сессию по-настоящему
+  /// можно только для встроенного демо-аккаунта (он всегда есть заново);
+  /// для остальных, зарегистрированных за сессию, честнее разлогинить и
+  /// дать войти заново, чем притвориться вошедшим в несуществующего
+  /// пользователя.
+  @override
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString(_kTokenKey);
+    final savedEmail = prefs.getString(_kEmailKey);
+    if (savedToken != null && savedEmail != null && _users.containsKey(savedEmail)) {
+      _token = savedToken;
+      _email = savedEmail;
+    } else {
+      await prefs.remove(_kTokenKey);
+      await prefs.remove(_kEmailKey);
+    }
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_token == null) {
+      await prefs.remove(_kTokenKey);
+      await prefs.remove(_kEmailKey);
+    } else {
+      await prefs.setString(_kTokenKey, _token!);
+      await prefs.setString(_kEmailKey, _email!);
+    }
+  }
+
   @override
   Future<RegistrationResult> register({
     required String email,
@@ -50,7 +88,7 @@ class MockAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<void> confirmEmail(String token) async {
+  Future<void> confirmEmail(String token, {String? email}) async {
     _MockUser? user;
     for (final u in _users.values) {
       if (u.confirmationToken == token) {
@@ -66,6 +104,7 @@ class MockAuthRepository extends AuthRepository {
     _tokenCounter++;
     _token = 'mock-token-$_tokenCounter';
     _email = user.email;
+    await _persist();
     notifyListeners();
   }
 
@@ -81,6 +120,7 @@ class MockAuthRepository extends AuthRepository {
     _tokenCounter++;
     _token = 'mock-token-$_tokenCounter';
     _email = user.email;
+    await _persist();
     notifyListeners();
   }
 
@@ -88,6 +128,7 @@ class MockAuthRepository extends AuthRepository {
   void logout() {
     _token = null;
     _email = null;
+    unawaited(_persist());
     notifyListeners();
   }
 
@@ -118,6 +159,7 @@ class MockAuthRepository extends AuthRepository {
     _users[newEmail] = user;
     _token = null;
     _email = null;
+    await _persist();
     notifyListeners();
     return RegistrationResult(email: newEmail, confirmationToken: confirmationToken);
   }

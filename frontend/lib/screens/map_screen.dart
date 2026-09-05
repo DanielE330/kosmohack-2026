@@ -111,9 +111,9 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         _dateIndex = dates.isEmpty ? 0 : dates.length - 1;
         _loading = false;
       });
-      // Личный кабинет ведёт сюда сразу с намерением рисовать — на самой
-      // карте отдельной кнопки «Нарисовать полигон» больше нет, поэтому
-      // включаем режим рисования один раз при первой загрузке.
+      // Личный кабинет может привести сюда сразу с намерением рисовать
+      // (`?draw=1`) — включаем режим рисования один раз при первой
+      // загрузке. Есть и прямой способ — свой FAB прямо на карте.
       if (widget.startDrawing && !_consumedStartDrawing) {
         _consumedStartDrawing = true;
         if (_needsLogin) {
@@ -150,8 +150,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     );
   }
 
-  /// Отменяет уже идущее рисование — единственный оставшийся способ
-  /// выключить `_drawing` вручную (включает его только личный кабинет).
+  /// Отменяет уже идущее рисование.
   void _cancelDrawing() {
     setState(() {
       _drawing = false;
@@ -505,6 +504,30 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                     label: Text(_draftPoints.length >= 3
                         ? 'Готово (${_draftPoints.length})'
                         : 'Отменить рисование'),
+                  ),
+                ),
+              // Прямой запуск рисования с самой карты — раньше сюда можно
+              // было попасть только через кнопку в личном кабинете
+              // (`/map?draw=1`), теперь есть и прямой путь, без лишнего
+              // перехода на другой экран.
+              if (!_loading && _error == null && !_drawing)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.extended(
+                    onPressed: () {
+                      if (_needsLogin) {
+                        _promptLogin();
+                        return;
+                      }
+                      setState(() {
+                        _drawing = true;
+                        _draftPoints.clear();
+                        _redoPoints.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    label: const Text('Создать полигон'),
                   ),
                 ),
             ],
