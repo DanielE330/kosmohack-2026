@@ -1,4 +1,4 @@
-anon_polygon_id,date,primary_ndvi_pred
+anon_polygon_id,date,primary_ndvi_true
 AOI-0001,2010-08-29,0.2399312403719533
 AOI-0001,2010-10-25,0.1773519879865904
 AOI-0001,2011-06-13,0.6556946421421691

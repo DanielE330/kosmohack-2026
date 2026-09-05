@@ -261,12 +261,19 @@ n_reference_years, status, crop_type
   ложные аномалии (частая причина провала на защите).
 - **Формат `submission.csv`** (только строки `is_synthetic_gap=True`):
   ```
-  anon_polygon_id,date,primary_ndvi_pred
+  anon_polygon_id,date,primary_ndvi_true
   AOI-0001,2025-06-14,0.543218
   AOI-0037,2025-07-03,0.391005
   ```
   `date` в `YYYY-MM-DD`, разделитель — запятая, кодировка UTF-8, без NaN и
-  дублей пар `anon_polygon_id+date`.
+  дублей пар `anon_polygon_id+date`. **Важно**: в тексте `docs/tz.pdf`
+  (стр. «Формат submission.csv») третья колонка называется
+  `primary_ndvi_pred` — но платформа хакатона на практике требует
+  `primary_ndvi_true` (подтверждено: `ml/submission_ensemble_v9.csv`
+  командой уже успешно проверен именно с этим именем, и явно
+  задокументировано в `ml/src/inference_ensemble.py` как
+  `PLATFORM_TARGET_COL`). Расхождение между текстом ТЗ и реальным
+  поведением платформы — используйте `primary_ndvi_true`, не текст ТЗ.
 - **Метрика**: `RMSE = sqrt(mean((y_true - y_pred)^2))`, переводится в
   `GapScore = round(30 * max(0, 1 - RMSE/0.10), 2)`. RMSE=0 → 30 баллов,
   RMSE≥0.10 → 0 баллов. Порог 0.10 ≈ качество baseline «среднее двух
