@@ -29,7 +29,7 @@ from private_adaptation import (  # noqa: E402
 WHEAT_MODEL_PATH = ROOT / "models/wheat_gap_model.joblib"
 EXTRA_MODEL_PATH = ROOT / "models/extra_trees_gap_model.joblib"
 REWEIGHTED_MODEL_PATH = ROOT / "models/reweighted_hgb_model.joblib"
-SUBMISSION_PATH = ROOT / "submission_ensemble_v7.csv"
+SUBMISSION_PATH = ROOT / "submissions" / "submission_ensemble_v7.csv"
 DIAGNOSTICS_PATH = ROOT / "reports/private_adaptation_v7.csv"
 SUMMARY_PATH = ROOT / "reports/private_adaptation_v7.json"
 OUTPUT_COL = "primary_ndvi_true"
@@ -81,6 +81,8 @@ def main() -> None:
     # Порядок сверен с submission_h6_residual.csv — файлом, подтверждённо
     # прошедшим проверку платформы (не тот порядок, что в тексте ТЗ).
     submission = submission[[DATE_COL, OUTPUT_COL, ID_COL]]
+
+    SUBMISSION_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     submission.to_csv(SUBMISSION_PATH, index=False, encoding="utf-8")
     diagnostics = v7[

@@ -36,3 +36,7 @@ infra/caddy_config/
 # используются ни для обучения, ни для отбора моделей — и не должны
 # попасть в репозиторий даже случайно.
 ml/doc-*.zip
+
+# Кэш калибровочных таблиц (scripts/eval_reblend.py, eval_multimodel.py) —
+# производные pickle-файлы, пересчитываются за минуты, незачем коммитить.
+ml/reports/calibration_cache/

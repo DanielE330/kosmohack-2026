@@ -269,7 +269,7 @@ n_reference_years, status, crop_type
   дублей пар `anon_polygon_id+date`. **Важно**: в тексте `docs/tz.pdf`
   (стр. «Формат submission.csv») третья колонка называется
   `primary_ndvi_pred` — но платформа хакатона на практике требует
-  `primary_ndvi_true` (подтверждено: `ml/submission_ensemble_v9.csv`
+  `primary_ndvi_true` (подтверждено: `ml/submissions/submission_ensemble_v9.csv`
   командой уже успешно проверен именно с этим именем, и явно
   задокументировано в `ml/src/inference_ensemble.py` как
   `PLATFORM_TARGET_COL`). Расхождение между текстом ТЗ и реальным

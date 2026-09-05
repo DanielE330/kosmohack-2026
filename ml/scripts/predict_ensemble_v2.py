@@ -18,7 +18,7 @@ from wheat_model import predict_private_gaps_ensemble  # noqa: E402
 
 WHEAT_MODEL_PATH = ROOT / "models/wheat_gap_model.joblib"
 EXTRA_MODEL_PATH = ROOT / "models/extra_trees_gap_model.joblib"
-SUBMISSION_PATH = ROOT / "submission_ensemble_v2.csv"
+SUBMISSION_PATH = ROOT / "submissions" / "submission_ensemble_v2.csv"
 TARGET_OUTPUT_COL = "primary_ndvi_true"
 
 
@@ -69,6 +69,8 @@ def main() -> None:
         raise AssertionError("В submission есть NaN")
     if submission.duplicated([ID_COL, DATE_COL]).any():
         raise AssertionError("В submission есть дубликаты")
+
+    SUBMISSION_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     submission.to_csv(SUBMISSION_PATH, index=False, encoding="utf-8")
     print(f"submission: {SUBMISSION_PATH} ({len(submission):,} строк)")

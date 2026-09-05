@@ -18,10 +18,10 @@ KEY = ["anon_polygon_id", "date"]
 OUTPUT_COL = "primary_ndvi_true"
 LOCAL_SCALE = 1.30
 GLOBAL_SCALE = 1.15
-V3_PATH = ROOT / "submission_ensemble_v3.csv"
-V4_PATH = ROOT / "submission_ensemble_v4.csv"
-V5_PATH = ROOT / "submission_ensemble_v5.csv"
-OUTPUT_PATH = ROOT / "submission_ensemble_v6.csv"
+V3_PATH = ROOT / "submissions" / "submission_ensemble_v3.csv"
+V4_PATH = ROOT / "submissions" / "submission_ensemble_v4.csv"
+V5_PATH = ROOT / "submissions" / "submission_ensemble_v5.csv"
+OUTPUT_PATH = ROOT / "submissions" / "submission_ensemble_v6.csv"
 
 
 def load_version(path: Path, name: str) -> pd.DataFrame:
@@ -56,6 +56,7 @@ def main() -> None:
     submission = merged[KEY].copy()
     submission[OUTPUT_COL] = prediction
     submission["date"] = submission["date"].dt.strftime("%Y-%m-%d")
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     submission.to_csv(OUTPUT_PATH, index=False, encoding="utf-8")
 
     print(f"submission: {OUTPUT_PATH} ({len(submission):,} строк)")
