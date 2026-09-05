@@ -307,8 +307,15 @@ Z = (NDVI_факт − NDVI_climatology_mean) / NDVI_climatology_std
   старте приложения и слать `Authorization: Bearer <token>` — больше
   работы ради фичи, которой не было в ТЗ.
 
-**Ещё не реализовано на бэкенде:** параметр `region` у `GET /polygons`
-(автопоиск контуров — Flutter уже его вызывает, см. `frontend.md`).
+**Реализовано:** параметр `region` у `GET /polygons` (bbox `lat1,lon1,lat2,lon2`
+или название региона) — см. `app/services/region_search.py`. Сначала
+отдаются уже известные полигоны, чей центроид попадает в область; если
+таких нет — сервис сам находит открытые сельхозконтуры через Overpass API
+(OSM: `landuse=farmland/orchard/vineyard/meadow`), сохраняет их как
+`is_custom=false` и возвращает. Название региона геокодируется в bbox
+через Nominatim (OSM). Полноценный ESA WorldCereal не подключён — это
+растровая классификация через GEE/STAC, а не готовые векторные контуры,
+и требует отдельной инфраструктуры/доступов.
 
 **Разница в схеме:** `PolygonOut.area_id` у бэкенда всегда `null`
 (поле для демо-группировки, не часть их модели `Polygon`) — Flutter это
