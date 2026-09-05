@@ -1,13 +1,15 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_db, get_http_client
 from app.models.polygon import Polygon
 from app.models.user import User
 from app.schemas.polygon import PolygonCreate, PolygonOut, PolygonUpdate
+from app.services import region_search
 
 router = APIRouter(tags=["polygons"])
 
@@ -17,11 +19,61 @@ router = APIRouter(tags=["polygons"])
     response_model=list[PolygonOut],
     summary="Список полигонов для карты",
 )
-async def list_polygons(db: AsyncSession = Depends(get_db)) -> list[Polygon]:
+async def list_polygons(
+    region: str | None = Query(
+        None,
+        description=(
+            "Bbox `lat1,lon1,lat2,lon2` или название региона — автопоиск доступных "
+            "сельхозконтуров (OSM) для новой территории, а не только статический список"
+        ),
+        examples=["47.0,39.0,47.2,39.3"],
+    ),
+    db: AsyncSession = Depends(get_db),
+    http_client: httpx.AsyncClient = Depends(get_http_client),
+) -> list[Polygon]:
     """Все зарегистрированные полигоны: открытые AOI датасета соревнования
-    (`is_custom=false`) и полигоны, нарисованные пользователями (`is_custom=true`)."""
+    (`is_custom=false`) и полигоны, нарисованные пользователями (`is_custom=true`).
+
+    С параметром `region` — сначала отдаём уже известные полигоны, чей
+    центроид попадает в эту область (повторный поиск не плодит дублей),
+    а если таких нет — находим открытые сельхозконтуры через Overpass
+    (OSM: landuse=farmland/orchard/vineyard/meadow), сохраняем их как
+    несобственные полигоны (`is_custom=false`) и возвращаем."""
     result = await db.execute(select(Polygon).order_by(Polygon.id))
-    return list(result.scalars().all())
+    all_polygons = list(result.scalars().all())
+
+    if region is None:
+        return all_polygons
+
+    bbox = await region_search.resolve_bbox(region, http_client)
+    if bbox is None:
+        return []
+
+    in_bbox = [p for p in all_polygons if region_search.centroid_in_bbox(p.points, bbox)]
+    if in_bbox:
+        return in_bbox
+
+    existing_ids = {p.id for p in all_polygons}
+    found = await region_search.fetch_osm_farmland(bbox, http_client)
+    new_polygons = [
+        Polygon(
+            id=item["id"],
+            label=item["label"],
+            crop_type=item["crop_type"],
+            points=item["points"],
+            is_custom=False,
+        )
+        for item in found
+        if item["id"] not in existing_ids
+    ]
+    if not new_polygons:
+        return []
+
+    db.add_all(new_polygons)
+    await db.commit()
+    for polygon in new_polygons:
+        await db.refresh(polygon)
+    return new_polygons
 
 
 @router.post(

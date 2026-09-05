@@ -29,8 +29,11 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
-@pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def _ensure_test_database_exists():
+    # Не autouse: чистые юнит-тесты (test_gapfill.py, test_region_search.py)
+    # не поднимают БД вообще и не должны требовать доступный Postgres —
+    # только тесты, которые реально просят `db_session`/`client`.
     admin_url = _DEV_DATABASE_URL.rsplit("/", 1)[0] + "/vegmon"
     db_name = TEST_DATABASE_URL.rsplit("/", 1)[1]
     admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
@@ -44,7 +47,7 @@ async def _ensure_test_database_exists():
 
 
 @pytest_asyncio.fixture
-async def db_session():
+async def db_session(_ensure_test_database_exists):
     engine = create_async_engine(TEST_DATABASE_URL)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -2,6 +2,8 @@
 создание/чтение — публичные для датасета, изменение/удаление — только
 владелец своего `is_custom=true` полигона (см. tasks/backend.md)."""
 
+from app.services import region_search
+
 _POINTS = [[47.0, 39.0], [47.0, 39.1], [47.1, 39.1]]
 
 
@@ -76,3 +78,58 @@ async def test_update_unknown_polygon_returns_404(client):
         headers={"Authorization": f"Bearer {jwt}"},
     )
     assert res.status_code == 404
+
+
+async def test_region_returns_existing_polygon_without_calling_overpass(client, monkeypatch):
+    """Уже известный полигон внутри bbox — не ходим в Overpass повторно."""
+    jwt = await _register_and_confirm(client, "region-existing@example.com")
+    res = await client.post(
+        "/polygons/custom",
+        json={"points": _POINTS, "label": "В регионе"},
+        headers={"Authorization": f"Bearer {jwt}"},
+    )
+    assert res.status_code == 201
+
+    async def _fail_if_called(*args, **kwargs):
+        raise AssertionError("fetch_osm_farmland не должен вызываться, если контур уже есть")
+
+    monkeypatch.setattr(region_search, "fetch_osm_farmland", _fail_if_called)
+
+    res = await client.get("/polygons", params={"region": "46.9,38.9,47.2,39.2"})
+    assert res.status_code == 200
+    ids = [p["anon_polygon_id"] for p in res.json()]
+    assert len(ids) == 1
+
+
+async def test_region_fetches_and_persists_new_contours(client, monkeypatch):
+    """Ничего в этой области ещё нет — идём во внешний источник и сохраняем найденное."""
+
+    async def _fake_fetch(bbox, http_client):
+        return [
+            {"id": "osm-123", "label": "Найденное поле", "crop_type": None, "points": _POINTS}
+        ]
+
+    monkeypatch.setattr(region_search, "fetch_osm_farmland", _fake_fetch)
+
+    res = await client.get("/polygons", params={"region": "46.9,38.9,47.2,39.2"})
+    assert res.status_code == 200
+    found = res.json()
+    assert len(found) == 1
+    assert found[0]["anon_polygon_id"] == "osm-123"
+    assert found[0]["is_custom"] is False
+
+    # Повторный запрос того же региона отдаёт уже сохранённый контур,
+    # снова не дублируя его.
+    res = await client.get("/polygons", params={"region": "46.9,38.9,47.2,39.2"})
+    assert [p["anon_polygon_id"] for p in res.json()] == ["osm-123"]
+
+
+async def test_region_unresolvable_returns_empty_list(client, monkeypatch):
+    async def _fake_resolve(region, http_client):
+        return None
+
+    monkeypatch.setattr(region_search, "resolve_bbox", _fake_resolve)
+
+    res = await client.get("/polygons", params={"region": "нигде-не-существующее-место"})
+    assert res.status_code == 200
+    assert res.json() == []
