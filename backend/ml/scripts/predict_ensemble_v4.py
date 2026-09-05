@@ -76,6 +76,11 @@ def main() -> None:
     if not np.isfinite(submission[OUTPUT_COL]).all():
         raise AssertionError("В v4 submission есть inf")
 
+    # Порядок сверен построчно с submission_h6_residual.csv — файлом,
+    # подтверждённо прошедшим проверку платформы (не тот порядок, что в
+    # тексте ТЗ или раньше был в этом скрипте).
+    submission = submission[[DATE_COL, OUTPUT_COL, ID_COL]]
+
     submission.to_csv(SUBMISSION_PATH, index=False, encoding="utf-8")
     diagnostics.to_csv(CALIBRATION_REPORT_PATH, index=False, encoding="utf-8")
     summary = {

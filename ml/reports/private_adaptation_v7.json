@@ -1,8 +1,8 @@
 {
-  "submission_rows": 3112,
-  "calibration_rows": 10576,
-  "polygons": 78,
-  "locally_adapted_polygons": 78,
+  "submission_rows": 2323,
+  "calibration_rows": 7880,
+  "polygons": 20,
+  "locally_adapted_polygons": 20,
   "nonlinear_blend_by_crop": {
     "зерновые": [
       0.45,
@@ -21,5 +21,5 @@
       0.3
     ]
   },
-  "mean_abs_v7_minus_v5": 0.0036462989679204093
+  "mean_abs_v7_minus_v5": 0.004962375012562167
 }

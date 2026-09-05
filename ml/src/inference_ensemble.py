@@ -19,6 +19,10 @@ from wheat_specialist import predict_private_gaps_ensemble
 WHEAT_MODEL_PATH = ROOT_DIR / "models/wheat_gap_model.joblib"
 ENSEMBLE_SUBMISSION_PATH = ROOT_DIR / "submission_wheat_ensemble.csv"
 PLATFORM_TARGET_COL = "primary_ndvi_true"
+# Порядок сверен построчно с submission_h6_residual.csv — файлом,
+# подтверждённо прошедшим проверку платформы (не тот порядок, что в
+# тексте ТЗ).
+PLATFORM_COLUMN_ORDER = [DATE_COL, PLATFORM_TARGET_COL, ID_COL]
 
 
 def main() -> None:
@@ -54,7 +58,8 @@ def main() -> None:
         raise AssertionError("В submission есть NaN")
     if submission.duplicated([ID_COL, DATE_COL]).any():
         raise AssertionError("В submission есть дубликаты polygon + date")
-    if list(submission.columns) != [ID_COL, DATE_COL, PLATFORM_TARGET_COL]:
+    submission = submission[PLATFORM_COLUMN_ORDER]
+    if list(submission.columns) != PLATFORM_COLUMN_ORDER:
         raise AssertionError(f"Неверные колонки: {list(submission.columns)}")
 
     submission.to_csv(ENSEMBLE_SUBMISSION_PATH, index=False, encoding="utf-8")

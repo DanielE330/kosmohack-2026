@@ -30,3 +30,9 @@ infra/caddy_config/
 # Stray build output at repo root (Flutter build artifacts live under
 # frontend/build/, ignored via frontend/.gitignore already)
 /build/
+
+# Архивы, скачанные с платформы хакатона: doc-1788600416.zip содержит
+# private_test_ground_truth.csv. Пока идёт автопроверка, эти ответы не
+# используются ни для обучения, ни для отбора моделей — и не должны
+# попасть в репозиторий даже случайно.
+ml/doc-*.zip

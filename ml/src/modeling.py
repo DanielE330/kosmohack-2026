@@ -90,7 +90,10 @@ def _baseline_metrics(y: pd.Series, meta: pd.DataFrame) -> dict[str, float]:
     ):
         pred = meta[name].astype(float)
         valid = pred.notna()
-        metrics[f"{name}_rmse"] = rmse(y[valid], pred[valid])
+        # В реальном private_features.csv климатологии нет вовсе (не в части
+        # строк — колонки просто отсутствуют), тогда baseline_climatology
+        # целиком NaN — не считаем RMSE по пустому набору, а не падаем.
+        metrics[f"{name}_rmse"] = rmse(y[valid], pred[valid]) if valid.any() else float("nan")
     return metrics
 
 
