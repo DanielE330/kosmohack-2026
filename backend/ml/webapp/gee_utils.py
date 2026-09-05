@@ -157,6 +157,10 @@ def to_ee_geometry(payload: dict[str, Any]):
     return ee.Geometry(normalize_geojson_geometry(payload))
 
 
+# Alias so `webapp.main` can call either backend through one shared name.
+to_geometry = to_ee_geometry
+
+
 def _validate_dates(date_from: str, date_to: str) -> tuple[str, str]:
     try:
         start = date.fromisoformat(date_from)
