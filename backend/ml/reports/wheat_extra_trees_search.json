@@ -1,0 +1,43 @@
+{
+  "base_oof_rmse": 0.06264553726002592,
+  "wheat_rows": 7146,
+  "wheat_base_rmse": 0.06893529066479695,
+  "wheat_specialist_rmse": 0.09753079864834903,
+  "ensemble_oof_rmse": 0.06264553726002592,
+  "absolute_improvement": 0.0,
+  "residual_weight": 0.0,
+  "blend_weight": 0.0,
+  "improved_folds": 0,
+  "folds": [
+    {
+      "fold": 0,
+      "base_rmse": 0.06534397835152221,
+      "candidate_rmse": 0.06534397835152221,
+      "improvement": 0.0
+    },
+    {
+      "fold": 1,
+      "base_rmse": 0.0572872764842066,
+      "candidate_rmse": 0.0572872764842066,
+      "improvement": 0.0
+    },
+    {
+      "fold": 2,
+      "base_rmse": 0.061909644685875245,
+      "candidate_rmse": 0.061909644685875245,
+      "improvement": 0.0
+    },
+    {
+      "fold": 3,
+      "base_rmse": 0.06504042023792551,
+      "candidate_rmse": 0.06504042023792551,
+      "improvement": 0.0
+    },
+    {
+      "fold": 4,
+      "base_rmse": 0.06280963771495743,
+      "candidate_rmse": 0.06280963771495743,
+      "improvement": 0.0
+    }
+  ]
+}

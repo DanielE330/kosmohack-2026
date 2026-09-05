@@ -1,0 +1,11 @@
+numpy>=1.26,<3
+pandas>=2.0,<4
+scipy>=1.11,<2
+scikit-learn==1.8.0
+joblib>=1.3,<2
+
+# Зависимости веб-обвязки; для batch train/inference они не требуются.
+fastapi>=0.110,<1
+uvicorn[standard]>=0.27,<1
+pydantic>=2.6,<3
+earthengine-api>=0.1.390

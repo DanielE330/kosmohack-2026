@@ -1,0 +1,40 @@
+{
+  "seeds": [
+    311,
+    577,
+    911
+  ],
+  "mask_rate": 0.12,
+  "rows": 6351,
+  "unique_rows": 5608,
+  "base_rmse": 0.06550520298899686,
+  "calibrated_rmse": 0.06545722559495651,
+  "improvement": 4.797739404034662e-05,
+  "best": {
+    "mode": "global",
+    "lambda_polygon": 30.0,
+    "lambda_crop_month": 60.0,
+    "strength": 1.0,
+    "rmse": 0.06545722559495651,
+    "folds": [
+      {
+        "seed": 311,
+        "rows": 2117,
+        "base_rmse": 0.06480089324267402,
+        "calibrated_rmse": 0.06480252070690073
+      },
+      {
+        "seed": 577,
+        "rows": 2117,
+        "base_rmse": 0.06625552931952908,
+        "calibrated_rmse": 0.0661932825319728
+      },
+      {
+        "seed": 911,
+        "rows": 2117,
+        "base_rmse": 0.06545108039925418,
+        "calibrated_rmse": 0.06536840066455056
+      }
+    ]
+  }
+}
