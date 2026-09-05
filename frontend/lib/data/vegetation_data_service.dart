@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
 import '../models/demo_area.dart';
+import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 
@@ -32,8 +33,21 @@ abstract class VegetationDataService {
   /// группировки полигонов.
   List<DemoArea> getDemoAreas();
 
-  Future<List<NdviPolygon>> getPolygons();
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points);
+  /// [mapId] — только полигоны этой карты (нужен доступ); без него — все,
+  /// что видно текущему пользователю (открытые + свои/расшаренные карты).
+  Future<List<NdviPolygon>> getPolygons({int? mapId});
+
+  /// [mapId] — на какую карту добавить; без него — личная карта
+  /// пользователя (создаётся автоматически при первом обращении).
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label, int? mapId});
+
+  /// Карты, доступные текущему пользователю (свои + куда пригласили) —
+  /// см. критерий про совместную работу/шаринг.
+  Future<List<MapInfo>> getMaps();
+  Future<MapInfo> createMap(String name);
+  Future<List<MapMemberInfo>> getMapMembers(int mapId);
+  Future<MapMemberInfo> inviteToMap(int mapId, {required String email, required MapRole role});
+  Future<void> removeMapMember(int mapId, int userId);
 
   /// Update своего полигона: любой параметр — `null`, если не меняется.
   Future<NdviPolygon> updatePolygon(

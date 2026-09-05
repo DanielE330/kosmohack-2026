@@ -70,7 +70,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Чтобы изменять свои полигоны, нужно войти'),
-        action: SnackBarAction(label: 'Войти', onPressed: () => context.push('/login')),
+        action: SnackBarAction(label: 'Войти', onPressed: () => context.go('/login')),
       ),
     );
   }
@@ -171,10 +171,11 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     try {
       await widget.service.deletePolygon(_polygon.id);
       if (!mounted) return;
-      // Возврат назад: MapScreen сам перезапросит список полигонов после
-      // возврата (RouteObserver.didPopNext, см. map_screen.dart) —
-      // независимо от того, стрелкой в приложении или браузерной «назад».
-      context.pop();
+      // context.pop() тут не работает: у этого экрана нет стека для
+      // возврата — навигация сюда всегда идёт через context.go(), который
+      // заменяет весь стек целиком, а не пушит поверх. go('/map') всегда
+      // надёжно уводит с удалённого полигона.
+      context.go('/map');
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
@@ -202,6 +203,10 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     final canManage = _polygon.isCustom;
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/map'),
+        ),
         title: Text(_polygon.label),
         actions: [
           IconButton(
@@ -210,21 +215,48 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
             onPressed: _share,
           ),
           if (canManage) ...[
-            IconButton(
-              icon: _saving
-                  ? const SizedBox(
-                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.edit_outlined),
-              tooltip: 'Редактировать',
-              onPressed: (_loading || _saving || _deleting) ? null : _editDialog,
+            // Функция доступна только вошедшим — если не вошли, значок
+            // притушен и подпись в подсказке зачёркнута; сама кнопка
+            // остаётся нажимаемой и ведёт на экран входа.
+            Tooltip(
+              richMessage: _needsLogin
+                  ? const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Редактировать',
+                          style: TextStyle(decoration: TextDecoration.lineThrough),
+                        ),
+                        TextSpan(text: ' — нужно войти'),
+                      ],
+                    )
+                  : const TextSpan(text: 'Редактировать'),
+              child: IconButton(
+                icon: _saving
+                    ? const SizedBox(
+                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.edit_outlined, color: _needsLogin ? Colors.white38 : null),
+                onPressed: (_loading || _saving || _deleting) ? null : _editDialog,
+              ),
             ),
-            IconButton(
-              icon: _deleting
-                  ? const SizedBox(
-                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.delete_outline),
-              tooltip: 'Удалить полигон',
-              onPressed: (_loading || _deleting || _saving) ? null : _confirmDelete,
+            Tooltip(
+              richMessage: _needsLogin
+                  ? const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Удалить полигон',
+                          style: TextStyle(decoration: TextDecoration.lineThrough),
+                        ),
+                        TextSpan(text: ' — нужно войти'),
+                      ],
+                    )
+                  : const TextSpan(text: 'Удалить полигон'),
+              child: IconButton(
+                icon: _deleting
+                    ? const SizedBox(
+                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.delete_outline, color: _needsLogin ? Colors.white38 : null),
+                onPressed: (_loading || _deleting || _saving) ? null : _confirmDelete,
+              ),
             ),
           ],
         ],

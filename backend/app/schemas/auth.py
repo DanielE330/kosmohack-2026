@@ -17,6 +17,16 @@ class ConfirmEmailRequest(BaseModel):
     token: str = Field(..., description="Токен подтверждения из /auth/register")
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(..., examples=["StrongPass123"])
+    new_password: str = Field(..., min_length=8, examples=["EvenStrongerPass456"])
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr = Field(..., examples=["new-address@example.com"])
+    password: str = Field(..., description="Текущий пароль — подтверждение, что смену запрашивает владелец")
+
+
 class RegisterResponse(BaseModel):
     """Ответ на регистрацию.
 

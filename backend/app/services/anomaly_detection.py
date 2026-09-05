@@ -3,11 +3,18 @@
 Пороги (Z >= -1 — норма, -2 <= Z < -1 — угнетение биомассы, Z < -2 —
 критическая аномалия) зафиксированы в ТЗ и продублированы во Flutter
 (`frontend/lib/models/ndvi_point.dart`, `ndviStatusForZ`) — менять только
-синхронно с фронтендом.
+синхронно с фронтендом. `status_for_zscore` эту формулу не трогает.
 
-`explain_anomaly` — эвристика-заглушка по ERA5 (осадки/температура) для
-хакатона. Замените на реальный ML-инференс/причинный анализ, не меняя
-сигнатуру `group_into_periods`/вызывающий код.
+`explain_anomaly` теперь в первую очередь использует реальный причинный
+анализ из `backend/ml/src/anomalies.py` (через `app/services/ml_bridge`) —
+heat_and_drought/moisture_deficit/heat_stress/cold_stress/possible_harvest/
+weather_or_harvest/sensor_conflict/unconfirmed, с confidence и
+`requires_review`, вместо прежней грубой эвристики "осадки+температура за
+весь период". Сам факт аномалии (statuses/z-score) ML не пересчитывает —
+только объясняет причину уже готового статуса. Эвристика по ERA5 оставлена
+как fallback на случай, если ML недоступен. Сигнатура `group_into_periods`
+и вызывающий код (`app/ingestion/load_train_dataset.py`,
+`app/api/routes/timeseries.py`) не менялись.
 """
 
 from __future__ import annotations
@@ -15,14 +22,22 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 
+import pandas as pd
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.anomaly import AnomalyPeriod
 from app.models.enums import NdviStatus
 from app.models.timeseries import NdviObservation
+from app.services import ml_bridge
 
 ANOMALOUS_STATUSES = (NdviStatus.suppression, NdviStatus.critical)
+
+_STATUS_TO_ML = {
+    NdviStatus.normal: ml_bridge.ML_NORMAL,
+    NdviStatus.suppression: ml_bridge.ML_MODERATE,
+    NdviStatus.critical: ml_bridge.ML_CRITICAL,
+}
 
 
 def status_for_zscore(z: float) -> NdviStatus:
@@ -68,7 +83,9 @@ def apply_climatology(observations: list[NdviObservation]) -> None:
             obs.status = status_for_zscore(z)
 
 
-def explain_anomaly(worst: NdviObservation, run: list[NdviObservation]) -> str:
+def _explain_anomaly_heuristic(worst: NdviObservation, run: list[NdviObservation]) -> str:
+    """Эвристика-заглушка по ERA5 (осадки/температура за весь период) —
+    fallback на случай, если ML-интерпретация недоступна."""
     value = worst.primary_ndvi if worst.primary_ndvi is not None else worst.primary_ndvi_pred
     deviation = (value or 0.0) - (worst.ndvi_climatology_mean or 0.0)
     parts = [f"NDVI ниже климатической нормы на {abs(deviation):.2f}"]
@@ -84,6 +101,36 @@ def explain_anomaly(worst: NdviObservation, run: list[NdviObservation]) -> str:
     return "; ".join(parts) + "."
 
 
+def explain_anomaly(
+    worst: NdviObservation,
+    run: list[NdviObservation],
+    interpretation: "pd.DataFrame | None" = None,
+) -> str:
+    """Текстовая интерпретация причины периода аномалии.
+
+    ``interpretation`` — результат `ml_bridge.interpret_anomaly_causes` по
+    ВСЕМУ ряду полигона (см. `group_into_periods`), с реальными причинами
+    (heat_and_drought, moisture_deficit, ...), confidence и требованием
+    проверки. Если для даты ``worst`` там нет надёжной причины (ML недоступен,
+    упал, либо `anomaly_reason` пуст), используется старая ERA5-эвристика.
+    """
+    if interpretation is not None:
+        key = worst.date.isoformat()
+        if key in interpretation.index:
+            row = interpretation.loc[key]
+            reason = row.get("anomaly_reason")
+            if isinstance(reason, str) and reason:
+                parts = [reason]
+                confidence = row.get("cause_confidence")
+                if confidence is not None and not pd.isna(confidence):
+                    parts.append(f"уверенность в причине {float(confidence):.2f}")
+                if bool(row.get("requires_review")):
+                    parts.append("требуется проверка")
+                return "; ".join(parts) + "."
+
+    return _explain_anomaly_heuristic(worst, run)
+
+
 def group_into_periods(polygon_id: str, observations: list[NdviObservation]) -> list[AnomalyPeriod]:
     """Группирует подряд идущие даты со статусом suppression/critical в
     периоды (не по точке, а по непрерывному отрезку), как того требует
@@ -91,6 +138,11 @@ def group_into_periods(polygon_id: str, observations: list[NdviObservation]) -> 
     ordered = sorted(observations, key=lambda o: o.date)
     periods: list[AnomalyPeriod] = []
     run: list[NdviObservation] = []
+
+    # Считаем причины один раз по всему ряду полигона (не по точке/периоду) —
+    # весь ряд нужен ML для скользящих окон осадков/температуры (14/7 дней).
+    status_lookup = {id(obs): _STATUS_TO_ML.get(obs.status) for obs in ordered}
+    interpretation = ml_bridge.interpret_anomaly_causes(ordered, status_lookup)
 
     def flush() -> None:
         if not run:
@@ -107,7 +159,7 @@ def group_into_periods(polygon_id: str, observations: list[NdviObservation]) -> 
                 severity=severity,
                 min_z_score=worst.ndvi_zscore or 0.0,
                 deviation=(value or 0.0) - (worst.ndvi_climatology_mean or 0.0),
-                explanation=explain_anomaly(worst, run),
+                explanation=explain_anomaly(worst, run, interpretation),
             )
         )
         run.clear()

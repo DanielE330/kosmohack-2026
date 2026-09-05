@@ -53,7 +53,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
       _error = null;
     });
     try {
-      await widget.auth.confirmEmail(token);
+      await widget.auth.confirmEmail(token, email: widget.prefillEmail);
       if (!mounted) return;
       context.go('/map');
     } catch (e) {
@@ -70,7 +70,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/map'),
         ),
         title: const Text('Подтверждение почты'),
       ),
@@ -96,10 +96,9 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
                   child: const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(
-                      'Реальная отправка писем пока не подключена, поэтому токен '
-                      'подтверждения уже подставлен в поле ниже — просто нажмите '
-                      '«Подтвердить». Когда подключим почту, это поле уберём и '
-                      'токен будет приходить только в письме.',
+                      'Токен подтверждения также должен прийти письмом — но на '
+                      'случай, если почта задержится или не дойдёт, он уже '
+                      'подставлен в поле ниже: просто нажмите «Подтвердить».',
                       style: TextStyle(fontSize: 13),
                     ),
                   ),

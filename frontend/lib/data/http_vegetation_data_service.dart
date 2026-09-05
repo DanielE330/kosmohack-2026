@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
 import '../models/demo_area.dart';
+import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
@@ -49,8 +50,14 @@ class HttpVegetationDataService implements VegetationDataService {
   List<DemoArea> getDemoAreas() => const [];
 
   @override
-  Future<List<NdviPolygon>> getPolygons() async {
-    final res = await _client.get(_uri('/polygons'));
+  Future<List<NdviPolygon>> getPolygons({int? mapId}) async {
+    // С токеном — иначе бэкенд отдаёт только открытые (без карты) сидовые
+    // полигоны датасета: полигоны на своих/расшаренных картах видны
+    // только тому, у кого есть доступ (см. backend/app/api/routes/polygons.py).
+    final res = await _client.get(
+      _uri('/polygons', mapId != null ? {'map_id': '$mapId'} : null),
+      headers: _authHeaders(),
+    );
     _checkOk(res);
     final list = jsonDecode(res.body) as List;
     return list
@@ -59,16 +66,62 @@ class HttpVegetationDataService implements VegetationDataService {
   }
 
   @override
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points) async {
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label, int? mapId}) async {
     final res = await _client.post(
       _uri('/polygons/custom'),
       headers: _authHeaders(json: true),
       body: jsonEncode({
         'points': points.map((p) => [p.latitude, p.longitude]).toList(),
+        if (label != null && label.isNotEmpty) 'label': label,
+        'map_id': ?mapId,
       }),
     );
     _checkOk(res);
     return NdviPolygon.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<MapInfo>> getMaps() async {
+    final res = await _client.get(_uri('/maps'), headers: _authHeaders());
+    _checkOk(res);
+    final list = jsonDecode(res.body) as List;
+    return list.map((e) => MapInfo.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Future<MapInfo> createMap(String name) async {
+    final res = await _client.post(
+      _uri('/maps'),
+      headers: _authHeaders(json: true),
+      body: jsonEncode({'name': name}),
+    );
+    _checkOk(res);
+    return MapInfo.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<MapMemberInfo>> getMapMembers(int mapId) async {
+    final res = await _client.get(_uri('/maps/$mapId/members'), headers: _authHeaders());
+    _checkOk(res);
+    final list = jsonDecode(res.body) as List;
+    return list.map((e) => MapMemberInfo.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Future<MapMemberInfo> inviteToMap(int mapId, {required String email, required MapRole role}) async {
+    final res = await _client.post(
+      _uri('/maps/$mapId/invite'),
+      headers: _authHeaders(json: true),
+      body: jsonEncode({'email': email, 'role': role.name}),
+    );
+    _checkOk(res);
+    return MapMemberInfo.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> removeMapMember(int mapId, int userId) async {
+    final res = await _client.delete(_uri('/maps/$mapId/members/$userId'), headers: _authHeaders());
+    _checkOk(res);
   }
 
   @override
@@ -104,9 +157,10 @@ class HttpVegetationDataService implements VegetationDataService {
     required double maxLat,
     required double maxLon,
   }) async {
-    final res = await _client.get(_uri('/polygons', {
-      'region': '$minLat,$minLon,$maxLat,$maxLon',
-    }));
+    final res = await _client.get(
+      _uri('/polygons', {'region': '$minLat,$minLon,$maxLat,$maxLon'}),
+      headers: _authHeaders(),
+    );
     _checkOk(res);
     final list = jsonDecode(res.body) as List;
     return list

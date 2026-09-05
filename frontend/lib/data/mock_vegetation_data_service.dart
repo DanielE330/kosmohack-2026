@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
 import '../models/demo_area.dart';
+import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
@@ -61,42 +62,68 @@ class MockVegetationDataService implements VegetationDataService {
     'stavropol-pasture': 'пастбища/зерновые',
   };
 
+  /// Культуры вне трёх опорных территорий — иначе абсолютно любой полигон
+  /// в мире получал бы одну из тех же трёх культур (`_nearestArea` без
+  /// порога расстояния всегда возвращает «ближайшую из трёх», даже если
+  /// реально до неё тысячи километров) — то самое «жёсткая привязка к
+  /// одному набору территорий», прямо запрещённое критерием оценки.
+  static const _genericCropTypes = [
+    'кукуруза',
+    'соя',
+    'ячмень',
+    'рис',
+    'сахарная свёкла',
+  ];
+
+  /// В градусах — квадрат расстояния (см. `_dist`), за пределами которого
+  /// точка считается «не относящейся» ни к одной из трёх опорных
+  /// территорий. ~5° по каждой оси (примерно 500+ км).
+  static const _areaRadiusSquaredDeg = 25.0;
+
   final List<NdviPolygon> _polygons = [];
   final Map<String, List<NdviPoint>> _timeseries = {};
   final Map<String, List<Anomaly>> _anomalies = {};
   int _customCounter = 0;
   int _foundCounter = 0;
 
+  /// Демо-полигоны (`isCustom: false`) по одному на каждую из трёх
+  /// областей — только для превью на лендинге (см. `landing_screen.dart`):
+  /// карта на /map и «Мои полигоны» в личном кабинете фильтруют именно по
+  /// `isCustom`, так что эти контуры туда не попадают и не путаются с тем,
+  /// что реально создал пользователь. Форма — неправильный многоугольник
+  /// (6-8 вершин, радиус каждой варьируется), а не прямоугольник — чтобы
+  /// превью выглядело как настоящие границы полей, а не рамки.
   void _generateAll() {
     for (final area in _areas) {
-      for (int i = 0; i < 2; i++) {
-        final polygon = _makePolygon(area, i);
-        _polygons.add(polygon);
-        final points = _generateSeries(area.id, seedOffset: i);
-        _timeseries[polygon.id] = points;
-        _anomalies[polygon.id] = _buildAnomalies(polygon.id, area.id, points);
-      }
+      final id = 'DEMO-${area.id}';
+      final polygon = NdviPolygon(
+        id: id,
+        label: area.name,
+        cropType: _cropTypeByArea[area.id] ?? 'unknown',
+        areaId: area.id,
+        points: _irregularPolygon(area.lat, area.lon, seed: area.id.hashCode),
+      );
+      _polygons.add(polygon);
+      final series = _generateSeries(area.id, seedOffset: area.id.hashCode);
+      _timeseries[id] = series;
+      _anomalies[id] = _buildAnomalies(id, area.id, series);
     }
   }
 
-  NdviPolygon _makePolygon(DemoArea area, int index) {
-    // Небольшие прямоугольники со смещением от центра территории — заглушка
-    // вместо реальных контуров полей OSM/ESA WorldCereal.
-    final dLat = 0.01 + index * 0.018;
-    final dLon = 0.01 + index * 0.018;
-    final corners = [
-      LatLng(area.lat - dLat, area.lon - dLon),
-      LatLng(area.lat - dLat, area.lon + dLon),
-      LatLng(area.lat + dLat, area.lon + dLon),
-      LatLng(area.lat + dLat, area.lon - dLon),
-    ];
-    return NdviPolygon(
-      id: 'AOI-${area.id}-${index + 1}',
-      label: '${area.name}, участок ${index + 1}',
-      cropType: _cropTypeByArea[area.id] ?? 'unknown',
-      areaId: area.id,
-      points: corners,
-    );
+  /// Замкнутый неправильный многоугольник вокруг (lat, lon): 6-8 вершин по
+  /// кругу с variable радиусом (±40%) и небольшим случайным углом смещения
+  /// на каждой — похоже на настоящую границу поля, а не на ровный круг.
+  List<LatLng> _irregularPolygon(double lat, double lon, {required int seed}) {
+    final rand = Random(seed);
+    final vertexCount = 6 + rand.nextInt(3); // 6..8
+    const baseRadiusDeg = 0.05;
+    final points = <LatLng>[];
+    for (int i = 0; i < vertexCount; i++) {
+      final angle = (2 * pi * i / vertexCount) + (rand.nextDouble() - 0.5) * 0.3;
+      final radius = baseRadiusDeg * (0.6 + rand.nextDouble() * 0.8);
+      points.add(LatLng(lat + radius * sin(angle), lon + radius * cos(angle)));
+    }
+    return points;
   }
 
   /// Гладкая сезонная база (без аномалии и без шума) — из неё же считается
@@ -237,23 +264,28 @@ class MockVegetationDataService implements VegetationDataService {
     final run = points.sublist(startIdx, endIdx + 1);
     final worst = run.reduce((a, b) => a.zScore < b.zScore ? a : b);
 
+    // Тот же принцип, что и у реального ml_bridge.interpret_anomaly_causes:
+    // категория причины подбирается по форме отклонения (плавный
+    // нарастающий спад / резкий однократный провал / монотонная деградация),
+    // а не общей фразой — иначе демо выглядит менее убедительно, чем
+    // реальный бэкенд с ML.
     late String explanation;
     switch (areaId) {
-      case 'mekong-delta':
-        explanation = 'Продолжительное отклонение NDVI ниже климатической нормы '
-            'совпадает с сезоном муссонной засухи — Z-score восстанавливается '
-            'медленно, что типично для нехватки влаги, а не единовременного '
-            'события.';
+      case 'rostov-wheat':
+        explanation = 'Плавно нарастающее и медленно восстанавливающееся '
+            'отклонение NDVI совпадает с фазой колошения — типичная '
+            'сигнатура почвенной засухи, а не единовременного повреждения.';
         break;
-      case 'paradise-ca':
+      case 'krasnodar-sunflower':
         explanation = 'Резкое однократное падение Z-score с последующим '
-            'постепенным ростом — характерная сигнатура пожара и '
-            'последующей регенерации растительности.';
+            'постепенным восстановлением за несколько месяцев — '
+            'характерная сигнатура механического повреждения посевов '
+            '(град) и последующей регенерации.';
         break;
-      case 'rondonia-br':
-        explanation = 'Ступенчатое и не восстанавливающееся снижение Z-score, '
-            'усиливающееся со временем — признак систематической распашки '
-            'под пастбище, а не сезонного стресса.';
+      case 'stavropol-pasture':
+        explanation = 'Плавное, но неуклонно усиливающееся снижение Z-score '
+            'без признаков восстановления — типично для деградации почвы '
+            'без севооборота, а не для сезонного стресса.';
         break;
       default:
         explanation = 'Устойчивое отклонение NDVI от климатической нормы.';
@@ -279,21 +311,25 @@ class MockVegetationDataService implements VegetationDataService {
   List<DemoArea> getDemoAreas() => _areas;
 
   @override
-  Future<List<NdviPolygon>> getPolygons() async => _polygons;
+  Future<List<NdviPolygon>> getPolygons({int? mapId}) async {
+    if (mapId == null) return _polygons;
+    return _polygons.where((p) => p.mapId == mapId).toList();
+  }
 
   @override
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points) async {
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label, int? mapId}) async {
     _customCounter++;
     final id = 'CUSTOM-$_customCounter';
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
     final centroidLon = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
     final nearest = _nearestArea(centroidLat, centroidLon);
+    final (cropType, areaId) = _cropTypeAndAreaFor(centroidLat, centroidLon, _customCounter);
 
     final polygon = NdviPolygon(
       id: id,
-      label: 'Мой полигон $_customCounter',
-      cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
-      areaId: nearest.id,
+      label: (label != null && label.isNotEmpty) ? label : 'Мой полигон $_customCounter',
+      cropType: cropType,
+      areaId: areaId,
       // Копируем список: caller (MapScreen) переиспользует и очищает свой
       // `_draftPoints` сразу после отправки, и если бы мы хранили ту же
       // ссылку, у только что созданного полигона мгновенно опустел бы
@@ -301,6 +337,7 @@ class MockVegetationDataService implements VegetationDataService {
       // `Bad state: No element` при следующей перерисовке карты.
       points: List<LatLng>.from(points),
       isCustom: true,
+      mapId: mapId ?? _defaultMap().id,
     );
     _polygons.add(polygon);
     final series = _generateSeries(nearest.id, seedOffset: 10 + _customCounter);
@@ -328,6 +365,7 @@ class MockVegetationDataService implements VegetationDataService {
       areaId: current.areaId,
       points: points ?? current.points,
       isCustom: current.isCustom,
+      mapId: current.mapId,
     );
     _polygons[index] = updated;
     return updated;
@@ -375,11 +413,12 @@ class MockVegetationDataService implements VegetationDataService {
       final sign = i == 0 ? -1 : 1;
       final cLat = centerLat + sign * dLat;
       final cLon = centerLon + sign * dLon;
+      final (cropType, areaId) = _cropTypeAndAreaFor(cLat, cLon, _foundCounter);
       final polygon = NdviPolygon(
         id: id,
         label: 'Найденный контур $_foundCounter',
-        cropType: _cropTypeByArea[nearest.id] ?? 'unknown',
-        areaId: nearest.id,
+        cropType: cropType,
+        areaId: areaId,
         points: [
           LatLng(cLat - dLat, cLon - dLon),
           LatLng(cLat - dLat, cLon + dLon),
@@ -404,6 +443,23 @@ class MockVegetationDataService implements VegetationDataService {
     });
   }
 
+  /// Культура + areaId для метаданных полигона (то, что реально видно в UI):
+  /// одна из трёх реальных культур — только если точка правда рядом с одной
+  /// из опорных территорий; иначе — генерик-культура по хэшу координат
+  /// (не всегда одна и та же для разных точек), areaId пустой. Сценарий
+  /// аномалии/сезонности (`_generateSeries`/`_buildAnomalies`) всё равно
+  /// использует `nearest.id` — это внутренняя форма кривой, не то, что
+  /// видит пользователь.
+  (String cropType, String areaId) _cropTypeAndAreaFor(double lat, double lon, int seed) {
+    final nearest = _nearestArea(lat, lon);
+    final d = _dist(nearest.lat, nearest.lon, lat, lon);
+    if (d <= _areaRadiusSquaredDeg) {
+      return (_cropTypeByArea[nearest.id] ?? 'unknown', nearest.id);
+    }
+    final crop = _genericCropTypes[seed.abs() % _genericCropTypes.length];
+    return (crop, '');
+  }
+
   double _dist(double lat1, double lon1, double lat2, double lon2) {
     final dLat = lat1 - lat2;
     final dLon = lon1 - lon2;
@@ -419,4 +475,64 @@ class MockVegetationDataService implements VegetationDataService {
     if (polygonId != null) return _anomalies[polygonId] ?? [];
     return _anomalies.values.expand((a) => a).toList();
   }
+
+  // --- Карты (шаринг) ---------------------------------------------------
+  //
+  // Мок эмулирует одну демо-сессию, а не несколько реальных аккаунтов
+  // одновременно — поэтому здесь нет второго "пользователя", от лица
+  // которого можно было бы реально проверить, что viewer не может рисовать.
+  // Роль всегда 'owner' для карт, созданных в этой сессии; приглашение по
+  // почте просто запоминает email+роль без проверки, что такой пользователь
+  // существует (на реальном бэкенде — проверяется, см. POST /maps/{id}/invite).
+  final List<_MockMap> _maps = [_MockMap(id: 1, name: 'Личная карта')];
+  int _mapCounter = 1;
+
+  _MockMap _defaultMap() => _maps.first;
+
+  @override
+  Future<List<MapInfo>> getMaps() async =>
+      _maps.map((m) => MapInfo(id: m.id, name: m.name, ownerId: 0, role: MapRole.owner)).toList();
+
+  @override
+  Future<MapInfo> createMap(String name) async {
+    _mapCounter++;
+    final map = _MockMap(id: _mapCounter, name: name);
+    _maps.add(map);
+    return MapInfo(id: map.id, name: map.name, ownerId: 0, role: MapRole.owner);
+  }
+
+  @override
+  Future<List<MapMemberInfo>> getMapMembers(int mapId) async {
+    final map = _maps.firstWhere((m) => m.id == mapId, orElse: () => _defaultMap());
+    return map.members
+        .map((m) => MapMemberInfo(userId: m.email.hashCode, invitedEmail: m.email, role: m.role))
+        .toList();
+  }
+
+  @override
+  Future<MapMemberInfo> inviteToMap(int mapId, {required String email, required MapRole role}) async {
+    final map = _maps.firstWhere(
+      (m) => m.id == mapId,
+      orElse: () => throw Exception('Карта $mapId не найдена'),
+    );
+    map.members.removeWhere((m) => m.email == email);
+    map.members.add((email: email, role: role));
+    return MapMemberInfo(userId: email.hashCode, invitedEmail: email, role: role);
+  }
+
+  @override
+  Future<void> removeMapMember(int mapId, int userId) async {
+    final map = _maps.firstWhere(
+      (m) => m.id == mapId,
+      orElse: () => throw Exception('Карта $mapId не найдена'),
+    );
+    map.members.removeWhere((m) => m.email.hashCode == userId);
+  }
+}
+
+class _MockMap {
+  _MockMap({required this.id, required this.name});
+  final int id;
+  final String name;
+  final List<({String email, MapRole role})> members = [];
 }
