@@ -55,7 +55,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
     try {
       await widget.auth.confirmEmail(token);
       if (!mounted) return;
-      context.go('/demo');
+      context.go('/map');
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
