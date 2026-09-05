@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,7 @@ import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
+import '../utils/csv_download.dart';
 import '../utils/geo.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/dashboard_shell.dart';
@@ -21,9 +23,10 @@ class _Row {
 }
 
 /// Табличная сводка по своим участкам — площадь, культура, текущий статус
-/// и последняя зафиксированная аномалия. Экспорт в файл сознательно не
-/// реализован (не требуется ТЗ для MVP) — таблица служит именно как отчёт
-/// «на экране», который можно посмотреть или сфотографировать при демо.
+/// и последняя зафиксированная аномалия. Выбранные строки (чекбоксы) можно
+/// скачать как CSV — открывается в Excel как есть, поэтому отдельный
+/// .xlsx-писатель не подключался (лишняя зависимость ради того же результата
+/// для пользователя).
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
@@ -37,6 +40,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   List<_Row> _rows = [];
+  final Set<String> _selected = {};
   bool _loading = true;
   String? _error;
 
@@ -61,6 +65,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!widget.auth.isLoggedIn) {
       setState(() {
         _rows = [];
+        _selected.clear();
         _loading = false;
         _error = null;
       });
@@ -83,8 +88,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ..sort((a, b) => b.startDate.compareTo(a.startDate));
         rows.add(_Row(mine[i], polygonAreaHectares(mine[i]), status, own.isEmpty ? null : own.first));
       }
+      final rowIds = rows.map((r) => r.polygon.id).toSet();
       setState(() {
         _rows = rows;
+        // Выбор переживает обновление списка только для полигонов, которые
+        // в нём всё ещё есть (сменили карту — старый выбор чужой карты
+        // потерял бы смысл).
+        _selected.retainWhere(rowIds.contains);
         _loading = false;
       });
     } catch (e) {
@@ -93,6 +103,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _loading = false;
       });
     }
+  }
+
+  String _csvField(String value) {
+    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
+  }
+
+  void _exportSelected() {
+    final dateFmt = DateFormat('d MMM yyyy', 'ru');
+    final selectedRows = _rows.where((r) => _selected.contains(r.polygon.id)).toList();
+    final header = ['Участок', 'Культура', 'Площадь (га)', 'Статус', 'Последняя аномалия'];
+    final lines = [header.map(_csvField).join(',')];
+    for (final r in selectedRows) {
+      final anomaly = r.lastAnomaly == null
+          ? '—'
+          : '${dateFmt.format(r.lastAnomaly!.startDate)} – ${dateFmt.format(r.lastAnomaly!.endDate)}';
+      lines.add([
+        r.polygon.label,
+        r.polygon.cropType,
+        r.areaHectares.toStringAsFixed(1),
+        statusLabel(r.status),
+        anomaly,
+      ].map(_csvField).join(','));
+    }
+    final csv = lines.join('\r\n');
+
+    if (!kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Скачивание файлов поддерживается только в веб-версии')),
+      );
+      return;
+    }
+    downloadCsv('skytime_report.csv', csv);
   }
 
   @override
@@ -108,6 +153,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
             onPressed: () => context.go('/map'),
           ),
           title: const Text('Отчёты'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: FilledButton.icon(
+                onPressed: _selected.isEmpty ? null : _exportSelected,
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: Text('Скачать (${_selected.length})'),
+              ),
+            ),
+          ],
         ),
         body: RefreshIndicator(
           onRefresh: _load,
@@ -140,9 +195,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 rows: [
                                   for (final r in _rows)
                                     DataRow(
-                                      onSelectChanged: (_) => context.go('/polygon/${r.polygon.id}'),
+                                      selected: _selected.contains(r.polygon.id),
+                                      onSelectChanged: (selected) {
+                                        setState(() {
+                                          if (selected ?? false) {
+                                            _selected.add(r.polygon.id);
+                                          } else {
+                                            _selected.remove(r.polygon.id);
+                                          }
+                                        });
+                                      },
                                       cells: [
-                                        DataCell(Text(r.polygon.label)),
+                                        // Открыть карточку участка — теперь по тапу на само
+                                        // название, а не на всю строку: строка целиком отдана
+                                        // под выбор чекбоксом (см. onSelectChanged выше).
+                                        DataCell(
+                                          InkWell(
+                                            onTap: () => context.go('/polygon/${r.polygon.id}'),
+                                            child: Text(
+                                              r.polygon.label,
+                                              style: const TextStyle(
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                         DataCell(Text(r.polygon.cropType)),
                                         DataCell(Text('${r.areaHectares.toStringAsFixed(1)} га')),
                                         DataCell(Container(

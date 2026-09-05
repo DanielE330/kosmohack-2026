@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
+import '../data/status_transition_tracker.dart';
 import '../data/vegetation_data_service.dart';
-import '../models/anomaly.dart';
-import '../models/ndvi_point.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/dashboard_shell.dart';
 
-/// Лента аномалий по своим полигонам — «уведомления» в терминах ТЗ
-/// (детекция отклонений уже считается на бэкенде/моке, здесь только
-/// показываем результат в удобном списке, отсортированном по дате).
+/// Уведомление = переход статуса участка через границу «штатно / не
+/// штатно» с прошлого визита на этот экран (см.
+/// `data/status_transition_tracker.dart`) — не любое изменение Z-score и
+/// не полный список исторических аномалий, как было раньше: пользователю
+/// важно узнать именно про смену состояния, а не пересматривать одно и то
+/// же при каждом заходе.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
@@ -25,8 +26,8 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  List<Anomaly> _anomalies = [];
-  final Map<String, String> _polygonLabels = {};
+  List<StatusTransition> _transitions = [];
+  final Map<String, String> _explanations = {};
   bool _loading = true;
   String? _error;
 
@@ -50,7 +51,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // лента молча крутится бесконечно для незалогиненного посетителя.
     if (!widget.auth.isLoggedIn) {
       setState(() {
-        _anomalies = [];
+        _transitions = [];
         _loading = false;
         _error = null;
       });
@@ -61,21 +62,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _error = null;
     });
     try {
-      final polygons = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
-      final mine = polygons.where((p) => p.isCustom).toList();
-      final mineIds = mine.map((p) => p.id).toSet();
-      for (final p in mine) {
-        _polygonLabels[p.id] = p.label;
+      final tracker = StatusTransitionTracker.instance;
+      await tracker.refresh(widget.activeMapController);
+      final transitions = tracker.lastTransitions;
+
+      // Объяснение — для контекста у тех, кто стал "не штатно": последняя
+      // известная аномалия по этому участку, если она уже посчитана.
+      if (transitions.any((t) => !t.isImprovement)) {
+        final all = await widget.service.getAnomalies();
+        for (final t in transitions) {
+          if (t.isImprovement) continue;
+          final own = all.where((a) => a.polygonId == t.polygon.id).toList()
+            ..sort((a, b) => b.startDate.compareTo(a.startDate));
+          if (own.isNotEmpty) _explanations[t.polygon.id] = own.first.explanation;
+        }
       }
-      // Бэкенд/мок уже поддерживают запрос без polygonId — отдают все
-      // аномалии сразу, дальше просто фильтруем по своим id на клиенте.
-      final all = await widget.service.getAnomalies();
-      final mineAnomalies = all.where((a) => mineIds.contains(a.polygonId)).toList()
-        ..sort((a, b) => b.startDate.compareTo(a.startDate));
+
       setState(() {
-        _anomalies = mineAnomalies;
+        _transitions = transitions;
         _loading = false;
       });
+      // Пользователь увидел список — переходы больше не "непросмотренные"
+      // (сбрасывает и бейдж на "Уведомления" в сайдбаре).
+      await tracker.markSeen();
     } catch (e) {
       setState(() {
         _error = 'Не удалось загрузить уведомления: $e';
@@ -86,7 +95,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('d MMM yyyy', 'ru');
     return DashboardShell(
       active: DashboardSection.notifications,
       activeMapController: widget.activeMapController,
@@ -107,18 +115,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   children: [
                     if (_error != null)
                       Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(_error!))
-                    else if (_anomalies.isEmpty)
+                    else if (_transitions.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text('Отклонений по вашим участкам не обнаружено — всё в штатном режиме.'),
+                        child: Text(
+                          'Новых изменений статуса нет — либо всё стабильно, либо вы уже '
+                          'видели последние переходы.',
+                        ),
                       )
                     else
-                      for (final a in _anomalies)
-                        _AnomalyTile(
-                          anomaly: a,
-                          polygonLabel: _polygonLabels[a.polygonId] ?? a.polygonId,
-                          dateFmt: dateFmt,
-                          onTap: () => context.go('/polygon/${a.polygonId}'),
+                      for (final t in _transitions)
+                        _TransitionTile(
+                          transition: t,
+                          explanation: _explanations[t.polygon.id],
+                          onTap: () => context.go('/polygon/${t.polygon.id}'),
                         ),
                   ],
                 ),
@@ -128,22 +138,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-class _AnomalyTile extends StatelessWidget {
-  const _AnomalyTile({
-    required this.anomaly,
-    required this.polygonLabel,
-    required this.dateFmt,
-    required this.onTap,
-  });
+class _TransitionTile extends StatelessWidget {
+  const _TransitionTile({required this.transition, required this.explanation, required this.onTap});
 
-  final Anomaly anomaly;
-  final String polygonLabel;
-  final DateFormat dateFmt;
+  final StatusTransition transition;
+  final String? explanation;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = statusColor(anomaly.severity);
+    final color = statusColor(transition.to);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
@@ -155,7 +159,7 @@ class _AnomalyTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                anomaly.severity == NdviStatus.critical ? Icons.error_outline : Icons.warning_amber_outlined,
+                transition.isImprovement ? Icons.trending_up : Icons.trending_down,
                 color: color,
               ),
               const SizedBox(width: 12),
@@ -163,15 +167,16 @@ class _AnomalyTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(polygonLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    Text(transition.polygon.label,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                     const SizedBox(height: 2),
                     Text(
-                      '${dateFmt.format(anomaly.startDate)} — ${dateFmt.format(anomaly.endDate)}',
+                      '${statusLabel(transition.from)} → ${statusLabel(transition.to)}',
                       style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
                     ),
-                    if (anomaly.explanation.isNotEmpty) ...[
+                    if (explanation != null && explanation!.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Text(anomaly.explanation, style: const TextStyle(fontSize: 12.5)),
+                      Text(explanation!, style: const TextStyle(fontSize: 12.5)),
                     ],
                   ],
                 ),
@@ -181,7 +186,7 @@ class _AnomalyTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(999)),
                 child: Text(
-                  statusLabel(anomaly.severity),
+                  transition.isImprovement ? 'Улучшилось' : 'Ухудшилось',
                   style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
                 ),
               ),

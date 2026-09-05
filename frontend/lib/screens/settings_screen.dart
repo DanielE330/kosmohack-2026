@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
+import '../theme.dart';
 import '../theme_controller.dart';
 import '../widgets/dashboard_shell.dart';
 
@@ -34,6 +35,39 @@ class SettingsScreen extends StatelessWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Раньше жило в "Участках" — перенесено сюда: карточка входа
+            // логичнее среди прочих настроек аккаунта, а "Участки" остаётся
+            // чисто про список полигонов.
+            AnimatedBuilder(
+              animation: auth,
+              builder: (context, _) {
+                final loggedIn = auth.isLoggedIn;
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: SkyTimeColors.teal,
+                      child: Icon(
+                        loggedIn ? Icons.person : Icons.person_outline,
+                        color: Colors.white,
+                      ),
+                    ),
+                    title: Text(loggedIn ? (auth.email ?? '') : 'Вы не вошли'),
+                    subtitle: Text(
+                      loggedIn
+                          ? 'Аккаунт подтверждён'
+                          : 'Войдите, чтобы сохранять свои полигоны на сервере',
+                    ),
+                    trailing: loggedIn
+                        ? TextButton(onPressed: auth.logout, child: const Text('Выйти'))
+                        : TextButton(
+                            onPressed: () => context.go('/login'),
+                            child: const Text('Войти'),
+                          ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
             Text('Оформление', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Card(

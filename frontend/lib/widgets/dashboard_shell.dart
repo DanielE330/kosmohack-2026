@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/active_map_controller.dart';
+import '../data/status_transition_tracker.dart';
 import '../theme.dart';
 import 'map_switcher.dart';
 
@@ -43,11 +44,28 @@ class DashboardShell extends StatelessWidget {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends StatefulWidget {
   const _Sidebar({required this.active, this.activeMapController});
 
   final DashboardSection active;
   final ActiveMapController? activeMapController;
+
+  @override
+  State<_Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<_Sidebar> {
+  @override
+  void initState() {
+    super.initState();
+    // Сайдбар пересоздаётся при переходе на любой экран (DashboardShell
+    // оборачивает их все) — удобное место обновлять счётчик уведомлений,
+    // не заставляя каждый экран явно об этом заботиться.
+    final controller = widget.activeMapController;
+    if (controller != null) {
+      StatusTransitionTracker.instance.refresh(controller);
+    }
+  }
 
   static const _items = [
     (DashboardSection.map, Icons.grid_view_outlined, 'Карта'),
@@ -87,17 +105,28 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (activeMapController != null) ...[
-            MapSwitcher(controller: activeMapController!),
+          if (widget.activeMapController != null) ...[
+            MapSwitcher(controller: widget.activeMapController!),
             const SizedBox(height: 16),
           ],
           for (final (section, icon, label) in _items) ...[
-            _SidebarItem(
-              icon: icon,
-              label: label,
-              selected: section == active,
-              onTap: () => _onTap(context, section),
-            ),
+            section == DashboardSection.notifications
+                ? ValueListenableBuilder<int>(
+                    valueListenable: StatusTransitionTracker.instance.unseenCount,
+                    builder: (context, count, _) => _SidebarItem(
+                      icon: icon,
+                      label: label,
+                      selected: section == widget.active,
+                      badgeCount: count,
+                      onTap: () => _onTap(context, section),
+                    ),
+                  )
+                : _SidebarItem(
+                    icon: icon,
+                    label: label,
+                    selected: section == widget.active,
+                    onTap: () => _onTap(context, section),
+                  ),
             const SizedBox(height: 4),
           ],
           const Spacer(),
@@ -118,12 +147,16 @@ class _SidebarItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  /// >0 — непросмотренные уведомления (переходы штатно↔не штатно с
+  /// последнего визита на /notifications), см. `status_transition_tracker.dart`.
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -143,14 +176,32 @@ class _SidebarItem extends StatelessWidget {
                 color: selected ? Colors.white : SkyTimeColors.navy.withValues(alpha: 0.72),
               ),
               const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : SkyTimeColors.navy.withValues(alpha: 0.72),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : SkyTimeColors.navy.withValues(alpha: 0.72),
+                  ),
                 ),
               ),
+              if (badgeCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.white : const Color(0xFFB3261E),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: selected ? SkyTimeColors.teal : Colors.white,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
