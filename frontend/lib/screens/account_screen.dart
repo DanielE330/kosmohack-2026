@@ -11,8 +11,8 @@ import '../utils/geo.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/dashboard_shell.dart';
 
-/// Личный кабинет: кто вошёл, свои полигоны, быстрые действия
-/// («создать полигон», «посмотреть все на карте»). «Свои» полигоны —
+/// Свои полигоны + быстрые действия («создать полигон», «посмотреть все на
+/// карте»). Кто вошёл/выход — в Настройках, не здесь. «Свои» полигоны —
 /// это `isCustom == true`: в моке они все принадлежат текущей сессии,
 /// на реальном бэкенде — те, что создал текущий пользователь (владелец
 /// проверяется на сервере при изменении/удалении).
@@ -106,37 +106,31 @@ class _AccountScreenState extends State<AccountScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/map'),
         ),
-        title: const Text('Личный кабинет'),
+        title: const Text('Мои участки'),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: SkyTimeColors.teal,
-                  child: Icon(
-                    loggedIn ? Icons.person : Icons.person_outline,
-                    color: Colors.white,
+            if (!loggedIn)
+              Card(
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: SkyTimeColors.teal,
+                    child: Icon(Icons.person_outline, color: Colors.white),
+                  ),
+                  title: const Text('Вы не вошли'),
+                  subtitle: const Text('Войдите, чтобы сохранять свои полигоны на сервере'),
+                  trailing: TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Войти'),
                   ),
                 ),
-                title: Text(loggedIn ? (widget.auth.email ?? '') : 'Вы не вошли'),
-                subtitle: Text(
-                  loggedIn
-                      ? 'Аккаунт подтверждён'
-                      : 'Войдите, чтобы сохранять свои полигоны на сервере',
-                ),
-                trailing: loggedIn
-                    ? TextButton(onPressed: widget.auth.logout, child: const Text('Выйти'))
-                    : TextButton(
-                        onPressed: () => context.go('/login'),
-                        child: const Text('Войти'),
-                      ),
               ),
-            ),
-            const SizedBox(height: 16),
+            // Кто вошёл/выход — теперь в Настройках, здесь только участки
+            // (см. запрос пользователя перенести аккаунт из "Участков").
+            if (!loggedIn) const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
