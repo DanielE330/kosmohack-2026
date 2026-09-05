@@ -1,0 +1,14 @@
+{
+  "submission_rows": 3112,
+  "calibration_rows": 10576,
+  "polygons": 78,
+  "locally_adapted_polygons": 78,
+  "global_blend_by_crop": {
+    "зерновые": 0.65,
+    "озимая пшеница": 0.35,
+    "пастбища/зерновые": 0.3,
+    "подсолнечник": 0.35
+  },
+  "mean_abs_v5_minus_v4": 0.0047474420850500635,
+  "max_abs_v5_minus_v4": 0.03747323751754539
+}

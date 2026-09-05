@@ -1,0 +1,485 @@
+{
+  "base_oof_rmse": 0.06312198279227728,
+  "best": {
+    "name": "wheat_apr_jul__apr_jun_all",
+    "rows": 2966,
+    "oof_rmse": 0.0630452086317045,
+    "residual_weight": 1.25,
+    "blend_weight": 0.2,
+    "improved_folds": 4,
+    "folds": [
+      {
+        "fold": 0,
+        "base_rmse": 0.06570796934826331,
+        "candidate_rmse": 0.06568062117014473,
+        "improvement": 2.734817811858581e-05
+      },
+      {
+        "fold": 1,
+        "base_rmse": 0.05798172250238154,
+        "candidate_rmse": 0.05780084077038188,
+        "improvement": 0.00018088173199965613
+      },
+      {
+        "fold": 2,
+        "base_rmse": 0.06209842753351126,
+        "candidate_rmse": 0.06194691034919103,
+        "improvement": 0.00015151718432022954
+      },
+      {
+        "fold": 3,
+        "base_rmse": 0.06528743202896202,
+        "candidate_rmse": 0.06518551412868824,
+        "improvement": 0.00010191790027377912
+      },
+      {
+        "fold": 4,
+        "base_rmse": 0.0637433516227237,
+        "candidate_rmse": 0.06379888807813364,
+        "improvement": -5.553645540994079e-05
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "name": "wheat_apr_jul__apr_jun_all",
+      "rows": 2966,
+      "oof_rmse": 0.0630452086317045,
+      "residual_weight": 1.25,
+      "blend_weight": 0.2,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06568062117014473,
+          "improvement": 2.734817811858581e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05780084077038188,
+          "improvement": 0.00018088173199965613
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06194691034919103,
+          "improvement": 0.00015151718432022954
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06518551412868824,
+          "improvement": 0.00010191790027377912
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06379888807813364,
+          "improvement": -5.553645540994079e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jun__apr_jun_6_20",
+      "rows": 1865,
+      "oof_rmse": 0.06304895220871402,
+      "residual_weight": 1.2999999999999998,
+      "blend_weight": 0.2,
+      "improved_folds": 5,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.0656460104546465,
+          "improvement": 6.19588936168064e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05791455316919378,
+          "improvement": 6.716933318776097e-05
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06190037988921236,
+          "improvement": 0.00019804764429889876
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06525630741918728,
+          "improvement": 3.112460977473808e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.0637322370831685,
+          "improvement": 1.11145395551987e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jun__may_jun_6_20",
+      "rows": 1386,
+      "oof_rmse": 0.06305277713729411,
+      "residual_weight": 1.2999999999999998,
+      "blend_weight": 0.25,
+      "improved_folds": 5,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06564880321735621,
+          "improvement": 5.9166130907103986e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05792493028698323,
+          "improvement": 5.679221539831025e-05
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06194311993577565,
+          "improvement": 0.00015530759773561137
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06526544451602748,
+          "improvement": 2.1987512934543152e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06368853025017926,
+          "improvement": 5.482137254443631e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jul__apr_jun_6_20",
+      "rows": 1865,
+      "oof_rmse": 0.06305800869069197,
+      "residual_weight": 1.25,
+      "blend_weight": 0.25,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06570769181598869,
+          "improvement": 2.775322746201292e-07
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05786203483032193,
+          "improvement": 0.00011968767205960962
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06191947096895021,
+          "improvement": 0.00017895656456105163
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06520657276806412,
+          "improvement": 8.085926089790307e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06378768948349901,
+          "improvement": -4.433786077531754e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jun__apr_jun_all",
+      "rows": 2966,
+      "oof_rmse": 0.06306603277190852,
+      "residual_weight": 1.2999999999999998,
+      "blend_weight": 0.15000000000000002,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.0656980330092134,
+          "improvement": 9.9363390499152e-06
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05786695276159248,
+          "improvement": 0.00011476974078905577
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06196096467725987,
+          "improvement": 0.0001374628562513941
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06523654658007941,
+          "improvement": 5.088544888261215e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.0637618074817893,
+          "improvement": -1.845585906561087e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jul__may_jun_6_20",
+      "rows": 1386,
+      "oof_rmse": 0.06307103047689916,
+      "residual_weight": 1.25,
+      "blend_weight": 0.25,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06571521091856604,
+          "improvement": -7.241570302726763e-06
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05786902599733364,
+          "improvement": 0.00011269650504790174
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06196478355006219,
+          "improvement": 0.00013364398344906797
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06525856795785324,
+          "improvement": 2.886407110877509e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06374030257884727,
+          "improvement": 3.0490438764213534e-06
+        }
+      ]
+    },
+    {
+      "name": "wheat_may_jun__may_jun_6_20",
+      "rows": 1386,
+      "oof_rmse": 0.06308886192259151,
+      "residual_weight": 1.4,
+      "blend_weight": 0.15000000000000002,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06565699031673007,
+          "improvement": 5.0979031533240904e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.0579575507747337,
+          "improvement": 2.41717276478412e-05
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.0621346659716173,
+          "improvement": -3.6238438106038495e-05
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06522650324300881,
+          "improvement": 6.0928785953207054e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06368218122148538,
+          "improvement": 6.117040123831963e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_may_jun__may_jun_all",
+      "rows": 2139,
+      "oof_rmse": 0.06308915168316782,
+      "residual_weight": 1.4,
+      "blend_weight": 0.1,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06568788836551928,
+          "improvement": 2.0080982744030695e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.05793332488634697,
+          "improvement": 4.839761603456921e-05
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06210507535300397,
+          "improvement": -6.647819492708318e-06
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06521622656051267,
+          "improvement": 7.120546844935349e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06371076614355906,
+          "improvement": 3.258547916464016e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_may_jun__jun_6_20",
+      "rows": 695,
+      "oof_rmse": 0.06309786047545808,
+      "residual_weight": 1.4,
+      "blend_weight": 0.2,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06560609209211508,
+          "improvement": 0.00010187725614822785
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.0579805748819985,
+          "improvement": 1.1476203830365628e-06
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.06214879724496619,
+          "improvement": -5.036971145493119e-05
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.0652523151241043,
+          "improvement": 3.5116904857718234e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.0637197437801345,
+          "improvement": 2.3607842589201677e-05
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jun__jun_6_20",
+      "rows": 695,
+      "oof_rmse": 0.06310600600910765,
+      "residual_weight": 1.4,
+      "blend_weight": 0.15000000000000002,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06566245829093906,
+          "improvement": 4.5511057324254534e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.057980140812770066,
+          "improvement": 1.581689611472592e-06
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.062067778151703556,
+          "improvement": 3.064938180770416e-05
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06528935732340528,
+          "improvement": -1.925294443261283e-06
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06374210634015468,
+          "improvement": 1.2452825690206781e-06
+        }
+      ]
+    },
+    {
+      "name": "wheat_apr_jul__jun_6_20",
+      "rows": 695,
+      "oof_rmse": 0.06311217217551104,
+      "residual_weight": 1.4,
+      "blend_weight": 0.15000000000000002,
+      "improved_folds": 4,
+      "folds": [
+        {
+          "fold": 0,
+          "base_rmse": 0.06570796934826331,
+          "candidate_rmse": 0.06569398223235638,
+          "improvement": 1.3987115906929914e-05
+        },
+        {
+          "fold": 1,
+          "base_rmse": 0.05798172250238154,
+          "candidate_rmse": 0.057972504468010846,
+          "improvement": 9.21803437069213e-06
+        },
+        {
+          "fold": 2,
+          "base_rmse": 0.06209842753351126,
+          "candidate_rmse": 0.062048254996617536,
+          "improvement": 5.017253689372503e-05
+        },
+        {
+          "fold": 3,
+          "base_rmse": 0.06528743202896202,
+          "candidate_rmse": 0.06526933888105228,
+          "improvement": 1.8093147909736818e-05
+        },
+        {
+          "fold": 4,
+          "base_rmse": 0.0637433516227237,
+          "candidate_rmse": 0.06378507153244135,
+          "improvement": -4.171990971765793e-05
+        }
+      ]
+    }
+  ]
+}
