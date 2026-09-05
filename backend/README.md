@@ -18,7 +18,8 @@ backend/
 │   ├── api/routes/               # auth, polygons, timeseries, anomalies
 │   ├── services/
 │   │   ├── gapfill.py            # восстановление primary_ndvi (baseline, заменяемый)
-│   │   └── anomaly_detection.py  # Z-score группировка + explanation (baseline, заменяемый)
+│   │   ├── anomaly_detection.py  # Z-score группировка + explanation (baseline, заменяемый)
+│   │   └── region_search.py      # автопоиск контуров по region= (OSM Overpass/Nominatim)
 │   └── ingestion/
 │       └── load_train_dataset.py # разовая загрузка data/train_dataset.csv
 ├── inference/

@@ -1,8 +1,21 @@
+from contextlib import asynccontextmanager
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import anomalies, auth, polygons, timeseries
 from app.config import settings
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Общий клиент для похода в открытые источники (Overpass/Nominatim) —
+    # см. app/services/region_search.py, используется в GET /polygons?region=...
+    app.state.http_client = httpx.AsyncClient()
+    yield
+    await app.state.http_client.aclose()
+
 
 app = FastAPI(
     title="Мониторинг вегетационной динамики — API",
@@ -12,6 +25,7 @@ app = FastAPI(
         "+ ERA5). Разработано для КОСМОХАКАТОН 2026, клиент — Flutter."
     ),
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
