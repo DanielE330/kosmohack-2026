@@ -3,22 +3,37 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
+import '../route_observer.dart';
 import '../utils/ndvi_style.dart';
+import '../widgets/about_dialog.dart';
+import '../widgets/skytime_logo.dart';
 import '../widgets/time_slider.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.service});
+  const MapScreen({
+    super.key,
+    required this.service,
+    required this.auth,
+    this.startDrawing = false,
+  });
 
   final VegetationDataService service;
+  final AuthRepository auth;
+
+  /// Личный кабинет ведёт сразу в режим рисования (кнопка «Создать
+  /// полигон» на /account) — на самой карте отдельной кнопки «Нарисовать
+  /// полигон» больше нет.
+  final bool startDrawing;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with RouteAware {
   List<NdviPolygon> _polygons = [];
   final Map<String, List<NdviPoint>> _timeseries = {};
   List<DateTime> _dates = [];
@@ -32,18 +47,37 @@ class _MapScreenState extends State<MapScreen> {
 
   final MapController _mapController = MapController();
   bool _searchingRegion = false;
+  bool _consumedStartDrawing = false;
 
   @override
   void initState() {
     super.initState();
+    widget.auth.addListener(_onAuthChanged);
     _load();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
+    widget.auth.removeListener(_onAuthChanged);
     _mapController.dispose();
     super.dispose();
   }
+
+  void _onAuthChanged() => setState(() {});
+
+  /// Стандартный `RouteAware` — вызывается, когда этот экран снова
+  /// становится верхним в стеке после `pop`, независимо от того, кто его
+  /// вызвал: внутриприложенческая стрелка «назад» или браузерная кнопка
+  /// (см. комментарий у `routeObserver` в app.dart).
+  @override
+  void didPopNext() => _load();
 
   Future<void> _load() async {
     setState(() {
@@ -63,6 +97,20 @@ class _MapScreenState extends State<MapScreen> {
         _dateIndex = dates.isEmpty ? 0 : dates.length - 1;
         _loading = false;
       });
+      // Личный кабинет ведёт сюда сразу с намерением рисовать — на самой
+      // карте отдельной кнопки «Нарисовать полигон» больше нет, поэтому
+      // включаем режим рисования один раз при первой загрузке.
+      if (widget.startDrawing && !_consumedStartDrawing) {
+        _consumedStartDrawing = true;
+        if (_needsLogin) {
+          _promptLogin();
+        } else if (mounted) {
+          setState(() {
+            _drawing = true;
+            _draftPoints.clear();
+          });
+        }
+      }
     } catch (e) {
       setState(() {
         _error = 'Не удалось загрузить данные: $e';
@@ -78,9 +126,25 @@ class _MapScreenState extends State<MapScreen> {
         (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b);
   }
 
-  void _toggleDrawing() {
+  /// Раньше проверялось только для реального бэкенда — теперь личный
+  /// кабинет предполагает, что создавать/менять свои полигоны можно
+  /// только войдя, независимо от мока/реального API.
+  bool get _needsLogin => !widget.auth.isLoggedIn;
+
+  void _promptLogin() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Чтобы рисовать и удалять свои полигоны, нужно войти'),
+        action: SnackBarAction(label: 'Войти', onPressed: () => context.push('/login')),
+      ),
+    );
+  }
+
+  /// Отменяет уже идущее рисование — единственный оставшийся способ
+  /// выключить `_drawing` вручную (включает его только личный кабинет).
+  void _cancelDrawing() {
     setState(() {
-      _drawing = !_drawing;
+      _drawing = false;
       _draftPoints.clear();
     });
   }
@@ -90,14 +154,8 @@ class _MapScreenState extends State<MapScreen> {
     setState(() => _draftPoints.add(point));
   }
 
-  /// go_router/Navigator переиспользует уже смонтированный `MapScreen` при
-  /// возврате назад, поэтому `initState`/`_load()` повторно не вызываются —
-  /// без этого явного перезапроса список полигонов не отражал бы удаление
-  /// или добавление, случившееся на экране деталей.
-  Future<void> _openPolygon(NdviPolygon polygon) async {
-    await context.push('/polygon/${polygon.id}', extra: polygon);
-    if (!mounted) return;
-    _load();
+  void _openPolygon(NdviPolygon polygon) {
+    context.push('/polygon/${polygon.id}');
   }
 
   Future<void> _finishDrawing() async {
@@ -163,7 +221,12 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NDVI-мониторинг'),
+        leading: IconButton(
+          icon: const Icon(Icons.info_outline),
+          tooltip: 'О проекте',
+          onPressed: () => showSkyTimeAboutDialog(context),
+        ),
+        title: SkyTimeLogo(height: 20, color: Theme.of(context).colorScheme.onPrimary),
         actions: [
           IconButton(
             icon: _searchingRegion
@@ -181,22 +244,24 @@ class _MapScreenState extends State<MapScreen> {
             tooltip: 'Обновить',
             onPressed: _loading ? null : _load,
           ),
+          IconButton(
+            icon: Icon(widget.auth.isLoggedIn ? Icons.account_circle : Icons.account_circle_outlined),
+            tooltip: widget.auth.isLoggedIn ? 'Личный кабинет (${widget.auth.email})' : 'Личный кабинет',
+            onPressed: () => context.push('/account'),
+          ),
         ],
       ),
-      floatingActionButton: _loading || _error != null
+      // Кнопки «Нарисовать полигон» на карте больше нет — режим рисования
+      // включается только из личного кабинета (/account). FAB здесь нужен
+      // только чтобы завершить/отменить уже идущее рисование.
+      floatingActionButton: (_loading || _error != null || !_drawing)
           ? null
           : FloatingActionButton.extended(
-              onPressed: _drawing
-                  ? (_draftPoints.length >= 3 ? _finishDrawing : _toggleDrawing)
-                  : _toggleDrawing,
-              icon: Icon(_drawing
-                  ? (_draftPoints.length >= 3 ? Icons.check : Icons.close)
-                  : Icons.draw_outlined),
-              label: Text(_drawing
-                  ? (_draftPoints.length >= 3
-                      ? 'Готово (${_draftPoints.length})'
-                      : 'Отменить рисование')
-                  : 'Нарисовать полигон'),
+              onPressed: _draftPoints.length >= 3 ? _finishDrawing : _cancelDrawing,
+              icon: Icon(_draftPoints.length >= 3 ? Icons.check : Icons.close),
+              label: Text(_draftPoints.length >= 3
+                  ? 'Готово (${_draftPoints.length})'
+                  : 'Отменить рисование'),
             ),
       body: _buildBody(),
     );
@@ -250,10 +315,18 @@ class _MapScreenState extends State<MapScreen> {
                   onTap: (tapPosition, point) => _onMapTap(point),
                 ),
                 children: [
+                  // Только спутник — Esri World Imagery (бесплатный, без
+                  // ключа, легален для встраивания как XYZ-тайлы). Yandex-
+                  // тайлы сюда нельзя: их спутник отдаётся только через
+                  // собственный JS Maps API, а не как обычные XYZ-тайлы —
+                  // хотлинк их внутренних тайл-серверов нарушает условия
+                  // использования и ненадёжен (могут заблокировать без
+                  // предупреждения).
                   TileLayer(
                     urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                     userAgentPackageName: 'com.kosmohack.kosmohack_app',
+                    maxNativeZoom: 19,
                   ),
                   PolygonLayer(
                     polygons: [
@@ -303,6 +376,21 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ],
+              ),
+              // Обязательная атрибуция тайлов Esri — как обычный текст, без
+              // кнопок и всплывающих панелей.
+              const Positioned(
+                right: 4,
+                bottom: 4,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: Color(0x99FFFFFF)),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      child: Text('Esri World Imagery', style: TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                ),
               ),
               if (_submittingDraft)
                 const Positioned.fill(
