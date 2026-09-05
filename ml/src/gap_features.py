@@ -46,6 +46,63 @@ DYNAMIC_COLS = [
 ]
 
 
+# Справочные агрономические значения по культурам — приближённые, взяты из
+# общей агрономической литературы (FAO crop coefficient tables и типичные
+# диапазоны для южной степной зоны), НЕ вычислены из train_dataset.csv —
+# иначе это была бы утечка целевой переменной в признаки. Именно поэтому
+# они константы "среднего справочника", а не подогнанные под наш датасет
+# числа: цель — дать модели физический prior, а не переоткрыть его из
+# тех же 39 полигонов, на которых и так мало данных для надёжного вывода
+# сложных взаимодействий "культура × температура/влага".
+#   optimal_temp_c   — примерная оптимальная средняя суточная t° в период
+#                       активной вегетации;
+#   water_need_mm_day — примерная суточная потребность во влаге в пике
+#                       вегетации (испарение + транспирация), мм/сутки;
+#   root_depth_m      — эффективная глубина корневой системы, м (глубже
+#                       корни — лучше буфер против краткосрочного дефицита
+#                       осадков, поэтому используется как делитель ниже).
+CROP_AGRONOMY = {
+    "озимая пшеница": {"optimal_temp_c": 18.0, "water_need_mm_day": 4.5, "root_depth_m": 1.2},
+    "подсолнечник": {"optimal_temp_c": 24.0, "water_need_mm_day": 5.5, "root_depth_m": 2.0},
+    "зерновые": {"optimal_temp_c": 18.0, "water_need_mm_day": 4.2, "root_depth_m": 1.1},
+    "пастбища/зерновые": {"optimal_temp_c": 20.0, "water_need_mm_day": 3.5, "root_depth_m": 0.4},
+}
+_DEFAULT_AGRONOMY = {"optimal_temp_c": 19.0, "water_need_mm_day": 4.3, "root_depth_m": 1.0}
+
+
+def _add_crop_agronomy_features(features: pd.DataFrame, crop: pd.Series) -> None:
+    """Признаки-отклонения от агрономических норм культуры — не сырые
+    константы (те были бы почти дублем `crop_*` dummy), а взаимодействие
+    константы культуры с уже интерполированной по соседям погодой
+    (`era5_temp_c_linear`/`era5_precip_mm_linear` — сырые значения в
+    query-строках скрыты, как и целевая переменная, поэтому используем
+    те же leakage-safe признаки, что уже посчитаны выше). [crop] — та же
+    заполненная ("unknown" вместо NaN) серия, что идёт на `crop_*` dummy."""
+    row_ids = crop.index
+
+    optimal_temp = crop.map(lambda c: CROP_AGRONOMY.get(c, _DEFAULT_AGRONOMY)["optimal_temp_c"])
+    water_need = crop.map(lambda c: CROP_AGRONOMY.get(c, _DEFAULT_AGRONOMY)["water_need_mm_day"])
+    root_depth = crop.map(lambda c: CROP_AGRONOMY.get(c, _DEFAULT_AGRONOMY)["root_depth_m"])
+
+    temp_proxy = features.loc[row_ids, "era5_temp_c_linear"] if "era5_temp_c_linear" in features else np.nan
+    precip_proxy = (
+        features.loc[row_ids, "era5_precip_mm_linear"] if "era5_precip_mm_linear" in features else np.nan
+    )
+
+    temp_deviation = temp_proxy - optimal_temp
+    water_deficit = water_need - precip_proxy
+
+    features.loc[row_ids, "crop_optimal_temp_c"] = optimal_temp
+    features.loc[row_ids, "crop_water_need_mm_day"] = water_need
+    features.loc[row_ids, "crop_root_depth_m"] = root_depth
+    features.loc[row_ids, "crop_temp_deviation"] = temp_deviation
+    features.loc[row_ids, "crop_heat_stress"] = temp_deviation.clip(lower=0)
+    features.loc[row_ids, "crop_cold_stress"] = (-temp_deviation).clip(lower=0)
+    features.loc[row_ids, "crop_water_deficit"] = water_deficit
+    # Глубже корни — меньше эффект краткосрочного дефицита осадков.
+    features.loc[row_ids, "crop_water_deficit_root_adjusted"] = water_deficit / root_depth
+
+
 @dataclass
 class GapFeatureResult:
     """Матрица признаков и метаданные строк, для которых строился прогноз."""
@@ -380,6 +437,7 @@ def build_gap_features(df: pd.DataFrame, query_mask: Iterable[bool]) -> GapFeatu
     crop = query_rows.set_index("_row_id")["crop_type"].fillna("unknown").astype(str)
     crop_dummies = pd.get_dummies(crop, prefix="crop", dtype=float)
     features = features.join(crop_dummies)
+    _add_crop_agronomy_features(features, crop)
     features = features.copy()  # дефрагментация после поэтапного добавления колонок
 
     meta = query_rows.set_index("_row_id")[[ID_COL, DATE_COL, "crop_type"]].copy()
