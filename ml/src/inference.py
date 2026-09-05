@@ -22,6 +22,12 @@ from modeling import predict_private_gaps
 # ("предсказание", не "истина") — переименование только на границе экспорта.
 PLATFORM_TARGET_COL = "primary_ndvi_true"
 
+# Порядок колонок тоже важен для платформы — сверено построчно с
+# submission_h6_residual.csv (файл, который уже подтверждённо прошёл
+# проверку): date, primary_ndvi_true, anon_polygon_id. НЕ тот порядок,
+# что в тексте ТЗ (anon_polygon_id, date, primary_ndvi_pred).
+PLATFORM_COLUMN_ORDER = [DATE_COL, PLATFORM_TARGET_COL, ID_COL]
+
 
 def main() -> None:
     if not MODEL_PATH.exists():
@@ -42,7 +48,9 @@ def main() -> None:
     assert len(submission) == expected_rows
     assert submission[PLATFORM_TARGET_COL].notna().all()
     assert not submission.duplicated([ID_COL, DATE_COL]).any()
-    assert list(submission.columns) == [ID_COL, DATE_COL, PLATFORM_TARGET_COL]
+
+    submission = submission[PLATFORM_COLUMN_ORDER]
+    assert list(submission.columns) == PLATFORM_COLUMN_ORDER
 
     submission.to_csv(SUBMISSION_PATH, index=False, encoding="utf-8")
     print(f"submission.csv: {SUBMISSION_PATH} ({len(submission):,} строк)")
