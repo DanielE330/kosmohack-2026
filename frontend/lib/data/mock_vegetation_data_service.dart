@@ -67,14 +67,45 @@ class MockVegetationDataService implements VegetationDataService {
   int _customCounter = 0;
   int _foundCounter = 0;
 
-  /// Раньше здесь сразу создавались 6 демо-полигонов (по 2 на каждую из
-  /// трёх областей — Ростовская/Краснодарский/Ставропольский), чтобы
-  /// сюжет с аномалией был виден сразу без входа. Теперь карта стартует
-  /// пустой — пользователь видит только то, что реально создал сам;
-  /// список `_areas`/`_cropTypeByArea` остался как справочник координат
-  /// для подбора культуры новому нарисованному полигону (см.
-  /// `_nearestArea`), не для предзаполнения демо-данных.
-  void _generateAll() {}
+  /// Демо-полигоны (`isCustom: false`) по одному на каждую из трёх
+  /// областей — только для превью на лендинге (см. `landing_screen.dart`):
+  /// карта на /map и «Мои полигоны» в личном кабинете фильтруют именно по
+  /// `isCustom`, так что эти контуры туда не попадают и не путаются с тем,
+  /// что реально создал пользователь. Форма — неправильный многоугольник
+  /// (6-8 вершин, радиус каждой варьируется), а не прямоугольник — чтобы
+  /// превью выглядело как настоящие границы полей, а не рамки.
+  void _generateAll() {
+    for (final area in _areas) {
+      final id = 'DEMO-${area.id}';
+      final polygon = NdviPolygon(
+        id: id,
+        label: area.name,
+        cropType: _cropTypeByArea[area.id] ?? 'unknown',
+        areaId: area.id,
+        points: _irregularPolygon(area.lat, area.lon, seed: area.id.hashCode),
+      );
+      _polygons.add(polygon);
+      final series = _generateSeries(area.id, seedOffset: area.id.hashCode);
+      _timeseries[id] = series;
+      _anomalies[id] = _buildAnomalies(id, area.id, series);
+    }
+  }
+
+  /// Замкнутый неправильный многоугольник вокруг (lat, lon): 6-8 вершин по
+  /// кругу с variable радиусом (±40%) и небольшим случайным углом смещения
+  /// на каждой — похоже на настоящую границу поля, а не на ровный круг.
+  List<LatLng> _irregularPolygon(double lat, double lon, {required int seed}) {
+    final rand = Random(seed);
+    final vertexCount = 6 + rand.nextInt(3); // 6..8
+    const baseRadiusDeg = 0.05;
+    final points = <LatLng>[];
+    for (int i = 0; i < vertexCount; i++) {
+      final angle = (2 * pi * i / vertexCount) + (rand.nextDouble() - 0.5) * 0.3;
+      final radius = baseRadiusDeg * (0.6 + rand.nextDouble() * 0.8);
+      points.add(LatLng(lat + radius * sin(angle), lon + radius * cos(angle)));
+    }
+    return points;
+  }
 
   /// Гладкая сезонная база (без аномалии и без шума) — из неё же считается
   /// среднее/std климатической нормы.
@@ -214,23 +245,28 @@ class MockVegetationDataService implements VegetationDataService {
     final run = points.sublist(startIdx, endIdx + 1);
     final worst = run.reduce((a, b) => a.zScore < b.zScore ? a : b);
 
+    // Тот же принцип, что и у реального ml_bridge.interpret_anomaly_causes:
+    // категория причины подбирается по форме отклонения (плавный
+    // нарастающий спад / резкий однократный провал / монотонная деградация),
+    // а не общей фразой — иначе демо выглядит менее убедительно, чем
+    // реальный бэкенд с ML.
     late String explanation;
     switch (areaId) {
-      case 'mekong-delta':
-        explanation = 'Продолжительное отклонение NDVI ниже климатической нормы '
-            'совпадает с сезоном муссонной засухи — Z-score восстанавливается '
-            'медленно, что типично для нехватки влаги, а не единовременного '
-            'события.';
+      case 'rostov-wheat':
+        explanation = 'Плавно нарастающее и медленно восстанавливающееся '
+            'отклонение NDVI совпадает с фазой колошения — типичная '
+            'сигнатура почвенной засухи, а не единовременного повреждения.';
         break;
-      case 'paradise-ca':
+      case 'krasnodar-sunflower':
         explanation = 'Резкое однократное падение Z-score с последующим '
-            'постепенным ростом — характерная сигнатура пожара и '
-            'последующей регенерации растительности.';
+            'постепенным восстановлением за несколько месяцев — '
+            'характерная сигнатура механического повреждения посевов '
+            '(град) и последующей регенерации.';
         break;
-      case 'rondonia-br':
-        explanation = 'Ступенчатое и не восстанавливающееся снижение Z-score, '
-            'усиливающееся со временем — признак систематической распашки '
-            'под пастбище, а не сезонного стресса.';
+      case 'stavropol-pasture':
+        explanation = 'Плавное, но неуклонно усиливающееся снижение Z-score '
+            'без признаков восстановления — типично для деградации почвы '
+            'без севооборота, а не для сезонного стресса.';
         break;
       default:
         explanation = 'Устойчивое отклонение NDVI от климатической нормы.';

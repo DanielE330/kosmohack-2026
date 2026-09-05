@@ -4,9 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.auth import ConfirmEmailRequest, LoginRequest, RegisterResponse, Token
+from app.schemas.auth import (
+    ChangeEmailRequest,
+    ChangePasswordRequest,
+    ConfirmEmailRequest,
+    LoginRequest,
+    RegisterResponse,
+    Token,
+)
 from app.schemas.user import UserCreate
 from app.security import create_access_token, hash_password, verify_password
 from app.services.email import send_confirmation_email
@@ -71,3 +78,49 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
     if not user.is_email_confirmed:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Почта не подтверждена")
     return Token(access_token=create_access_token(user.email))
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Сменить пароль текущего пользователя",
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    if not verify_password(payload.old_password, user.hashed_password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный текущий пароль")
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+
+
+@router.post(
+    "/change-email",
+    response_model=RegisterResponse,
+    summary="Сменить email текущего пользователя — требует повторного подтверждения новой почты",
+)
+async def change_email(
+    payload: ChangeEmailRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RegisterResponse:
+    if not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный пароль")
+    existing = await db.execute(select(User).where(User.email == payload.new_email))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Этот email уже занят")
+
+    # Новый JWT после смены email нужно будет получить заново через
+    # /auth/confirm-email — старый токен привязан к старому email и
+    # перестаёт быть валидным сразу же (get_current_user ищет по email).
+    confirmation_token = secrets.token_urlsafe(24)
+    user.email = payload.new_email
+    user.is_email_confirmed = False
+    user.email_confirmation_token = confirmation_token
+    await db.commit()
+    send_confirmation_email(user.email, confirmation_token)
+    return RegisterResponse(
+        user_id=user.id, email=user.email, email_confirmation_token=confirmation_token
+    )

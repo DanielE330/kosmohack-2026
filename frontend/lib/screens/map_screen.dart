@@ -313,6 +313,21 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
             tooltip: widget.auth.isLoggedIn ? 'Личный кабинет (${widget.auth.email})' : 'Личный кабинет',
             onPressed: () => context.go('/account'),
           ),
+          // На узких экранах сайдбар дашборда скрыт (см. DashboardShell) —
+          // без этого меню разделы аналитики/уведомлений/отчётов/настроек
+          // были бы недостижимы на телефоне.
+          if (MediaQuery.sizeOf(context).width < 900)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Ещё',
+              onSelected: (route) => context.go(route),
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: '/analytics', child: Text('Аналитика')),
+                PopupMenuItem(value: '/notifications', child: Text('Уведомления')),
+                PopupMenuItem(value: '/reports', child: Text('Отчёты')),
+                PopupMenuItem(value: '/settings', child: Text('Настройки')),
+              ],
+            ),
         ],
       ),
       // Ctrl+Z/Ctrl+Y во время рисования — отменить/вернуть последнюю

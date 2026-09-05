@@ -30,4 +30,11 @@ abstract class AuthRepository extends ChangeNotifier {
   Future<void> login({required String email, required String password});
 
   void logout();
+
+  Future<void> changePassword({required String oldPassword, required String newPassword});
+
+  /// Смена email требует повторного подтверждения — сразу после вызова
+  /// текущий токен становится недействительным (как и на бэкенде), новый
+  /// приходит после [confirmEmail] с возвращённым токеном.
+  Future<RegistrationResult> changeEmail({required String newEmail, required String password});
 }

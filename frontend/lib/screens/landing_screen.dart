@@ -99,10 +99,12 @@ class _LandingScreenState extends State<LandingScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _MapPreview(
-              // По умолчанию на превью видно только то, что создал сам
-              // пользователь — так живой бэкенд выглядит так же пусто,
-              // как и мок, пока не нарисован свой полигон.
-              polygons: _polygons.where((p) => p.isCustom).toList(),
+              // На превью — все полигоны: демо-контуры (не свои, только
+              // для витрины) плюс всё, что уже нарисовал сам пользователь.
+              // В отличие от /map, здесь это просто витрина возможностей,
+              // а не рабочий инструмент, так что пустое превью до первого
+              // входа никого не радует.
+              polygons: _polygons,
               statusAt: (id) {
                 final date = _dates.isEmpty ? DateTime.now() : _dates[_dateIndex];
                 return _pointAt(id, date)?.status ?? NdviStatus.normal;
@@ -238,6 +240,17 @@ class _MapPreview extends StatelessWidget {
                                       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                                   userAgentPackageName: 'com.kosmohack.kosmohack_app',
                                   maxNativeZoom: 19,
+                                ),
+                                PolygonLayer(
+                                  polygons: [
+                                    for (final p in polygons)
+                                      Polygon(
+                                        points: p.points,
+                                        color: statusColor(statusAt(p.id)).withValues(alpha: 0.25),
+                                        borderColor: statusColor(statusAt(p.id)),
+                                        borderStrokeWidth: 2,
+                                      ),
+                                  ],
                                 ),
                                 MarkerLayer(
                                   markers: [

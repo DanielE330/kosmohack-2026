@@ -6,23 +6,30 @@ import 'data/vegetation_data_service.dart';
 import 'models/ndvi_polygon.dart';
 import 'route_observer.dart';
 import 'screens/account_screen.dart';
+import 'screens/analytics_screen.dart';
 import 'screens/confirm_email_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'screens/polygon_detail_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/settings_screen.dart';
 import 'theme.dart';
+import 'theme_controller.dart';
 
 class KosmohackApp extends StatelessWidget {
   const KosmohackApp({
     super.key,
     required this.service,
     required this.auth,
+    required this.themeController,
   });
 
   final VegetationDataService service;
   final AuthRepository auth;
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +66,22 @@ class KosmohackApp extends StatelessWidget {
           builder: (context, state) => AccountScreen(service: service, auth: auth),
         ),
         GoRoute(
+          path: '/analytics',
+          builder: (context, state) => AnalyticsScreen(service: service, auth: auth),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => NotificationsScreen(service: service, auth: auth),
+        ),
+        GoRoute(
+          path: '/reports',
+          builder: (context, state) => ReportsScreen(service: service, auth: auth),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => SettingsScreen(auth: auth, themeController: themeController),
+        ),
+        GoRoute(
           path: '/login',
           builder: (context, state) => LoginScreen(auth: auth),
         ),
@@ -77,11 +100,16 @@ class KosmohackApp extends StatelessWidget {
       ],
     );
 
-    return MaterialApp.router(
-      title: 'SkyTime',
-      debugShowCheckedModeBanner: false,
-      theme: buildSkyTimeTheme(),
-      routerConfig: router,
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) => MaterialApp.router(
+        title: 'SkyTime',
+        debugShowCheckedModeBanner: false,
+        theme: buildSkyTimeTheme(),
+        darkTheme: buildSkyTimeDarkTheme(),
+        themeMode: themeController.mode,
+        routerConfig: router,
+      ),
     );
   }
 }

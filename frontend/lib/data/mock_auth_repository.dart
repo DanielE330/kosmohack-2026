@@ -2,8 +2,8 @@ import 'auth_repository.dart';
 
 class _MockUser {
   _MockUser({required this.email, required this.password, this.fullName});
-  final String email;
-  final String password;
+  String email;
+  String password;
   final String? fullName;
   bool confirmed = false;
   String? confirmationToken;
@@ -89,5 +89,36 @@ class MockAuthRepository extends AuthRepository {
     _token = null;
     _email = null;
     notifyListeners();
+  }
+
+  @override
+  Future<void> changePassword({required String oldPassword, required String newPassword}) async {
+    final user = _users[_email];
+    if (user == null || user.password != oldPassword) {
+      throw Exception('Неверный текущий пароль');
+    }
+    user.password = newPassword;
+  }
+
+  @override
+  Future<RegistrationResult> changeEmail({required String newEmail, required String password}) async {
+    final user = _users[_email];
+    if (user == null || user.password != password) {
+      throw Exception('Неверный пароль');
+    }
+    if (_users.containsKey(newEmail)) {
+      throw Exception('Этот email уже занят');
+    }
+    _users.remove(user.email);
+    user.email = newEmail;
+    user.confirmed = false;
+    _tokenCounter++;
+    final confirmationToken = 'mock-confirm-$_tokenCounter';
+    user.confirmationToken = confirmationToken;
+    _users[newEmail] = user;
+    _token = null;
+    _email = null;
+    notifyListeners();
+    return RegistrationResult(email: newEmail, confirmationToken: confirmationToken);
   }
 }
