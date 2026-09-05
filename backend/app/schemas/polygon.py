@@ -16,6 +16,11 @@ class PolygonCreate(BaseModel):
     )
     label: str | None = Field(None, description="Подпись, опционально", examples=["Мой полигон"])
     crop_type: str | None = Field(None, description="Культура, опционально", examples=["озимая пшеница"])
+    map_id: int | None = Field(
+        None,
+        description="Карта, на которую добавить полигон (см. GET /maps) — "
+        "если не указано, используется личная карта пользователя (создаётся при первом обращении)",
+    )
 
 
 class PolygonUpdate(BaseModel):
@@ -36,6 +41,7 @@ class PolygonOut(BaseModel):
     crop_type: str | None = Field(None, description="Культура", examples=["озимая пшеница"])
     area_id: str | None = Field(None, description="Группировка по территории", examples=[None])
     is_custom: bool = Field(..., description="True — нарисован пользователем, False — из датасета", examples=[False])
+    map_id: int | None = Field(None, description="Карта-владелец — None для открытых сидовых полигонов")
     points: list[Point] = Field(
         ..., description="Контур полигона: список точек [lat, lon]", examples=[_EXAMPLE_POINTS]
     )

@@ -11,6 +11,9 @@ class NdviPolygon {
   final String areaId;
   final List<LatLng> points;
   final bool isCustom;
+  /// Карта-владелец (см. `Map`/шаринг) — `null` для открытых сидовых
+  /// полигонов датасета, видных всем без входа.
+  final int? mapId;
 
   const NdviPolygon({
     required this.id,
@@ -19,6 +22,7 @@ class NdviPolygon {
     required this.areaId,
     required this.points,
     this.isCustom = false,
+    this.mapId,
   });
 
   LatLng get centroid {
@@ -34,6 +38,7 @@ class NdviPolygon {
       cropType: json['crop_type'] as String? ?? 'unknown',
       areaId: json['area_id'] as String? ?? '',
       isCustom: json['is_custom'] as bool? ?? false,
+      mapId: (json['map_id'] as num?)?.toInt(),
       points: (json['points'] as List)
           .map((p) => LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()))
           .toList(),
@@ -46,6 +51,7 @@ class NdviPolygon {
         'crop_type': cropType,
         'area_id': areaId,
         'is_custom': isCustom,
+        'map_id': mapId,
         'points': points.map((p) => [p.latitude, p.longitude]).toList(),
       };
 }

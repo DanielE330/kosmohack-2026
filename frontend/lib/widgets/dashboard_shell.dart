@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/active_map_controller.dart';
 import '../theme.dart';
+import 'map_switcher.dart';
 
 /// Раздел навигации в левом сайдбаре — по референсу макета из `style/`
 /// (`SkyTime Map & Account.dc.html`).
@@ -11,10 +13,13 @@ enum DashboardSection { map, account, analytics, notifications, reports, setting
 /// дашборд) — на узких (телефон/планшет) просто отдаёт [child] как есть,
 /// без сайдбара: там навигация остаётся через AppBar, как и была.
 class DashboardShell extends StatelessWidget {
-  const DashboardShell({super.key, required this.active, required this.child});
+  const DashboardShell({super.key, required this.active, required this.child, this.activeMapController});
 
   final DashboardSection active;
   final Widget child;
+  /// `null` — переключатель карт не показывается (напр. на экранах, где
+  /// он не нужен); не обязателен для существующих мест использования.
+  final ActiveMapController? activeMapController;
 
   static const _wideBreakpoint = 900.0;
 
@@ -30,7 +35,7 @@ class DashboardShell extends StatelessWidget {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Sidebar(active: active),
+          _Sidebar(active: active, activeMapController: activeMapController),
           Expanded(child: child),
         ],
       ),
@@ -39,9 +44,10 @@ class DashboardShell extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.active});
+  const _Sidebar({required this.active, this.activeMapController});
 
   final DashboardSection active;
+  final ActiveMapController? activeMapController;
 
   static const _items = [
     (DashboardSection.map, Icons.grid_view_outlined, 'Карта'),
@@ -81,6 +87,10 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (activeMapController != null) ...[
+            MapSwitcher(controller: activeMapController!),
+            const SizedBox(height: 16),
+          ],
           for (final (section, icon, label) in _items) ...[
             _SidebarItem(
               icon: icon,

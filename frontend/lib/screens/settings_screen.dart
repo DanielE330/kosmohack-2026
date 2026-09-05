@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
 import '../theme_controller.dart';
 import '../widgets/dashboard_shell.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.auth, required this.themeController});
+  const SettingsScreen({
+    super.key,
+    required this.auth,
+    required this.themeController,
+    required this.activeMapController,
+  });
 
   final AuthRepository auth;
   final ThemeController themeController;
+  final ActiveMapController activeMapController;
 
   @override
   Widget build(BuildContext context) {
     return DashboardShell(
       active: DashboardSection.settings,
+      activeMapController: activeMapController,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(

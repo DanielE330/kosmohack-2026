@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'data/active_map_controller.dart';
 import 'data/auth_repository.dart';
 import 'data/vegetation_data_service.dart';
 import 'models/ndvi_polygon.dart';
@@ -25,11 +26,13 @@ class KosmohackApp extends StatelessWidget {
     required this.service,
     required this.auth,
     required this.themeController,
+    required this.activeMapController,
   });
 
   final VegetationDataService service;
   final AuthRepository auth;
   final ThemeController themeController;
+  final ActiveMapController activeMapController;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +53,7 @@ class KosmohackApp extends StatelessWidget {
           builder: (context, state) => MapScreen(
             service: service,
             auth: auth,
+            activeMapController: activeMapController,
             startDrawing: state.uri.queryParameters['draw'] == '1',
           ),
         ),
@@ -63,23 +67,31 @@ class KosmohackApp extends StatelessWidget {
         ),
         GoRoute(
           path: '/account',
-          builder: (context, state) => AccountScreen(service: service, auth: auth),
+          builder: (context, state) =>
+              AccountScreen(service: service, auth: auth, activeMapController: activeMapController),
         ),
         GoRoute(
           path: '/analytics',
-          builder: (context, state) => AnalyticsScreen(service: service, auth: auth),
+          builder: (context, state) =>
+              AnalyticsScreen(service: service, auth: auth, activeMapController: activeMapController),
         ),
         GoRoute(
           path: '/notifications',
-          builder: (context, state) => NotificationsScreen(service: service, auth: auth),
+          builder: (context, state) =>
+              NotificationsScreen(service: service, auth: auth, activeMapController: activeMapController),
         ),
         GoRoute(
           path: '/reports',
-          builder: (context, state) => ReportsScreen(service: service, auth: auth),
+          builder: (context, state) =>
+              ReportsScreen(service: service, auth: auth, activeMapController: activeMapController),
         ),
         GoRoute(
           path: '/settings',
-          builder: (context, state) => SettingsScreen(auth: auth, themeController: themeController),
+          builder: (context, state) => SettingsScreen(
+            auth: auth,
+            themeController: themeController,
+            activeMapController: activeMapController,
+          ),
         ),
         GoRoute(
           path: '/login',

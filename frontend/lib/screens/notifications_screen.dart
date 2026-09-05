@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
@@ -13,10 +14,11 @@ import '../widgets/dashboard_shell.dart';
 /// (детекция отклонений уже считается на бэкенде/моке, здесь только
 /// показываем результат в удобном списке, отсортированном по дате).
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key, required this.service, required this.auth});
+  const NotificationsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
   final VegetationDataService service;
   final AuthRepository auth;
+  final ActiveMapController activeMapController;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -32,12 +34,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     widget.auth.addListener(_load);
+    widget.activeMapController.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     widget.auth.removeListener(_load);
+    widget.activeMapController.removeListener(_load);
     super.dispose();
   }
 
@@ -57,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _error = null;
     });
     try {
-      final polygons = await widget.service.getPolygons();
+      final polygons = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
       final mine = polygons.where((p) => p.isCustom).toList();
       final mineIds = mine.map((p) => p.id).toSet();
       for (final p in mine) {
@@ -85,6 +89,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final dateFmt = DateFormat('d MMM yyyy', 'ru');
     return DashboardShell(
       active: DashboardSection.notifications,
+      activeMapController: widget.activeMapController,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(

@@ -5,13 +5,44 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_http_client
+from app.api.deps import get_current_user, get_current_user_optional, get_db, get_http_client
+from app.models.map import Map
 from app.models.polygon import Polygon
 from app.models.user import User
 from app.schemas.polygon import PolygonCreate, PolygonOut, PolygonUpdate
-from app.services import gee_bridge, region_search
+from app.services import gee_bridge, maps as maps_service, region_search
 
 router = APIRouter(tags=["polygons"])
+
+
+async def _visible_polygons(db: AsyncSession, current_user: User | None) -> list[Polygon]:
+    """Открытые сидовые полигоны датасета (`map_id IS NULL`) — видны всем,
+    даже без входа, как и раньше. Полигоны на чьей-то карте (`map_id` задан)
+    видит только владелец/приглашённый участник этой карты — иначе личные
+    карты одного пользователя были бы видны всем через обычный `GET
+    /polygons` без параметров."""
+    result = await db.execute(select(Polygon).order_by(Polygon.id))
+    all_polygons = list(result.scalars().all())
+    if current_user is None:
+        return [p for p in all_polygons if p.map_id is None]
+
+    accessible_maps = await maps_service.list_accessible_maps(db, current_user)
+    accessible_map_ids = {m.id for m in accessible_maps}
+    return [p for p in all_polygons if p.map_id is None or p.map_id in accessible_map_ids]
+
+
+async def _require_edit_access(db: AsyncSession, polygon: Polygon, current_user: User) -> None:
+    if not polygon.is_custom:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Можно изменять только пользовательские полигоны")
+    if polygon.map_id is not None:
+        map_ = await db.get(Map, polygon.map_id)
+        if map_ is not None and await maps_service.can_edit(db, current_user, map_):
+            return
+    # Полигоны без карты (не должно возникать для новых, но подстраховка
+    # для данных до миграции 0003) — старая проверка по владельцу.
+    if polygon.owner_id == current_user.id:
+        return
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Нет прав редактировать этот полигон")
 
 
 @router.get(
@@ -28,32 +59,44 @@ async def list_polygons(
         ),
         examples=["47.0,39.0,47.2,39.3"],
     ),
+    map_id: int | None = Query(
+        None, description="Только полигоны конкретной карты (нужен доступ к ней)"
+    ),
     db: AsyncSession = Depends(get_db),
     http_client: httpx.AsyncClient = Depends(get_http_client),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> list[Polygon]:
-    """Все зарегистрированные полигоны: открытые AOI датасета соревнования
-    (`is_custom=false`) и полигоны, нарисованные пользователями (`is_custom=true`).
+    """Открытые AOI датасета соревнования (`map_id IS NULL`) видны всем;
+    полигоны на чьей-то карте — только владельцу/участникам этой карты.
 
-    С параметром `region` — сначала отдаём уже известные полигоны, чей
-    центроид попадает в эту область (повторный поиск не плодит дублей),
-    а если таких нет — находим открытые сельхозконтуры через Overpass
-    (OSM: landuse=farmland/orchard/vineyard/meadow), сохраняем их как
-    несобственные полигоны (`is_custom=false`) и возвращаем."""
-    result = await db.execute(select(Polygon).order_by(Polygon.id))
-    all_polygons = list(result.scalars().all())
+    С параметром `region` — сначала отдаём уже известные (видимые
+    пользователю) полигоны, чей центроид попадает в эту область (повторный
+    поиск не плодит дублей), а если таких нет — находим открытые
+    сельхозконтуры через Overpass (OSM), сохраняем их как несобственные
+    полигоны (`map_id=None`) и возвращаем."""
+    if map_id is not None:
+        if current_user is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти, чтобы смотреть эту карту")
+        map_ = await db.get(Map, map_id)
+        if map_ is None or not await maps_service.can_view(db, current_user, map_):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Карта не найдена")
+        result = await db.execute(select(Polygon).where(Polygon.map_id == map_id).order_by(Polygon.id))
+        return list(result.scalars().all())
+
+    visible = await _visible_polygons(db, current_user)
 
     if region is None:
-        return all_polygons
+        return visible
 
     bbox = await region_search.resolve_bbox(region, http_client)
     if bbox is None:
         return []
 
-    in_bbox = [p for p in all_polygons if region_search.centroid_in_bbox(p.points, bbox)]
+    in_bbox = [p for p in visible if region_search.centroid_in_bbox(p.points, bbox)]
     if in_bbox:
         return in_bbox
 
-    existing_ids = {p.id for p in all_polygons}
+    existing_ids = {p.id for p in visible}
     found = await region_search.fetch_osm_farmland(bbox, http_client)
     new_polygons = [
         Polygon(
@@ -115,6 +158,13 @@ async def create_custom_polygon(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Polygon:
+    if payload.map_id is not None:
+        target_map = await db.get(Map, payload.map_id)
+        if target_map is None or not await maps_service.can_edit(db, current_user, target_map):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Нет прав добавлять полигоны на эту карту")
+    else:
+        target_map = await maps_service.get_or_create_personal_map(db, current_user)
+
     polygon = Polygon(
         id=f"custom-{uuid.uuid4().hex[:12]}",
         label=payload.label,
@@ -122,6 +172,7 @@ async def create_custom_polygon(
         points=[list(p) for p in payload.points],
         is_custom=True,
         owner_id=current_user.id,
+        map_id=target_map.id,
     )
     db.add(polygon)
     await db.commit()
@@ -147,8 +198,7 @@ async def update_polygon(
     polygon = await db.get(Polygon, polygon_id)
     if polygon is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
-    if not polygon.is_custom or polygon.owner_id != current_user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Можно изменять только свои полигоны")
+    await _require_edit_access(db, polygon, current_user)
 
     if payload.label is not None:
         polygon.label = payload.label
@@ -175,8 +225,7 @@ async def delete_polygon(
     polygon = await db.get(Polygon, polygon_id)
     if polygon is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
-    if not polygon.is_custom or polygon.owner_id != current_user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Можно удалять только свои полигоны")
+    await _require_edit_access(db, polygon, current_user)
 
     await db.delete(polygon)
     await db.commit()

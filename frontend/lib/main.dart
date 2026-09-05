@@ -3,6 +3,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'data/active_map_controller.dart';
 import 'data/auth_repository.dart';
 import 'data/http_auth_repository.dart';
 import 'data/http_vegetation_data_service.dart';
@@ -34,5 +35,12 @@ void main() async {
   }
 
   await auth.init();
-  runApp(KosmohackApp(service: service, auth: auth, themeController: ThemeController()));
+  final activeMapController = ActiveMapController(service: service, auth: auth);
+  if (auth.isLoggedIn) await activeMapController.reload();
+  runApp(KosmohackApp(
+    service: service,
+    auth: auth,
+    themeController: ThemeController(),
+    activeMapController: activeMapController,
+  ));
 }

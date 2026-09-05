@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/ndvi_point.dart';
@@ -16,10 +17,11 @@ import '../widgets/dashboard_shell.dart';
 /// открытые/найденные автопоиском контуры сюда не входят, так как
 /// аналитика имеет смысл именно как «состояние моих полей».
 class AnalyticsScreen extends StatefulWidget {
-  const AnalyticsScreen({super.key, required this.service, required this.auth});
+  const AnalyticsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
   final VegetationDataService service;
   final AuthRepository auth;
+  final ActiveMapController activeMapController;
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -35,12 +37,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   void initState() {
     super.initState();
     widget.auth.addListener(_load);
+    widget.activeMapController.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     widget.auth.removeListener(_load);
+    widget.activeMapController.removeListener(_load);
     super.dispose();
   }
 
@@ -60,7 +64,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       _error = null;
     });
     try {
-      final all = await widget.service.getPolygons();
+      final all = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
       final mine = all.where((p) => p.isCustom).toList();
       final series = await Future.wait(mine.map((p) => widget.service.getTimeseries(p.id)));
       for (var i = 0; i < mine.length; i++) {
@@ -82,6 +86,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     return DashboardShell(
       active: DashboardSection.analytics,
+      activeMapController: widget.activeMapController,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(

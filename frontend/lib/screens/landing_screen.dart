@@ -341,7 +341,7 @@ class _Description extends StatelessWidget {
           ),
           const _FeatureRow(
             icon: Icons.warning_amber_rounded,
-            title: 'Аномалии по Z-score',
+            title: 'Детекция аномалий',
             text: 'Три уровня — штатное развитие, угнетение биомассы, критическая '
                 'аномалия — с объяснением вероятной причины.',
           ),
@@ -395,18 +395,18 @@ class _ZScoreLegendCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Шкала Z-score', style: Theme.of(context).textTheme.titleSmall),
+            Text('Статус участка', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 10),
-            _row(NdviStatus.normal, 'Z ≥ −1'),
-            _row(NdviStatus.suppression, '−2 ≤ Z < −1'),
-            _row(NdviStatus.critical, 'Z < −2'),
+            _row(NdviStatus.normal),
+            _row(NdviStatus.suppression),
+            _row(NdviStatus.critical),
           ],
         ),
       ),
     );
   }
 
-  Widget _row(NdviStatus status, String range) {
+  Widget _row(NdviStatus status) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -417,7 +417,7 @@ class _ZScoreLegendCard extends StatelessWidget {
             decoration: BoxDecoration(color: statusColor(status), shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
-          Text('${statusLabel(status)} ($range)'),
+          Text(statusLabel(status)),
         ],
       ),
     );
