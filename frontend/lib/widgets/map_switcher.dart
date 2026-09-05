@@ -23,12 +23,13 @@ class MapSwitcher extends StatelessWidget {
     switch (action) {
       case _MenuAction.create:
         await _promptCreate(context);
-      case _MenuAction.share:
-        final active = controller.active;
-        if (active != null) {
-          await showDialog(context: context, builder: (_) => ShareMapDialog(map: active, controller: controller));
-        }
     }
+  }
+
+  Future<void> _share(BuildContext context) async {
+    final active = controller.active;
+    if (active == null) return;
+    await showDialog(context: context, builder: (_) => ShareMapDialog(map: active, controller: controller));
   }
 
   Future<void> _promptCreate(BuildContext context) async {
@@ -62,41 +63,63 @@ class MapSwitcher extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final active = controller.active;
-        return InkWell(
-          onTap: () => _openMenu(context),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: SkyTimeColors.cream,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.map_outlined, size: 18, color: SkyTimeColors.navy),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    active?.name ?? (controller.loading ? 'Загрузка…' : 'Нет карт'),
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: SkyTimeColors.navy,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+        return Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => _openMenu(context),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: SkyTimeColors.cream,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.map_outlined, size: 18, color: SkyTimeColors.navy),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          active?.name ?? (controller.loading ? 'Загрузка…' : 'Нет карт'),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: SkyTimeColors.navy,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(Icons.unfold_more, size: 16, color: SkyTimeColors.navy),
+                    ],
                   ),
                 ),
-                const Icon(Icons.unfold_more, size: 16, color: SkyTimeColors.navy),
-              ],
+              ),
             ),
-          ),
+            // Раньше "Поделиться" была пунктом в выпадающем меню — не видна,
+            // пока не открыть меню. Теперь отдельная кнопка прямо рядом с
+            // переключателем, доступна в один клик (только у владельца
+            // карты — расшаренную карту раздать дальше нельзя).
+            if (active != null && active.role == MapRole.owner) ...[
+              const SizedBox(width: 6),
+              IconButton(
+                onPressed: () => _share(context),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                tooltip: 'Поделиться картой',
+                style: IconButton.styleFrom(
+                  backgroundColor: SkyTimeColors.cream,
+                  foregroundColor: SkyTimeColors.navy,
+                ),
+              ),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-enum _MenuAction { create, share }
+enum _MenuAction { create }
 
 class _MapMenuSheet extends StatelessWidget {
   const _MapMenuSheet({required this.controller});
@@ -134,12 +157,6 @@ class _MapMenuSheet extends StatelessWidget {
               title: const Text('Новая карта'),
               onTap: () => Navigator.pop(context, _MenuAction.create),
             ),
-            if (controller.active?.role == MapRole.owner)
-              ListTile(
-                leading: const Icon(Icons.share_outlined),
-                title: const Text('Поделиться текущей картой'),
-                onTap: () => Navigator.pop(context, _MenuAction.share),
-              ),
             const SizedBox(height: 8),
           ],
         ),
