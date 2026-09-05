@@ -21,9 +21,14 @@ class Polygon(Base):
     points: Mapped[list] = mapped_column(JSONB, nullable=False)
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # NULL — открытый сидовый полигон датасета соревнования, виден всем без
+    # входа (как и раньше). Заполнено — полигон принадлежит конкретной
+    # `Map` (см. app/models/map.py) и виден только владельцу/участникам.
+    map_id: Mapped[int | None] = mapped_column(ForeignKey("maps.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     owner: Mapped["User | None"] = relationship(back_populates="polygons")
+    map: Mapped["Map | None"] = relationship()
     observations: Mapped[list["NdviObservation"]] = relationship(
         back_populates="polygon", cascade="all, delete-orphan"
     )

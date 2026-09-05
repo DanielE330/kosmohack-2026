@@ -4,8 +4,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
+import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import '../route_observer.dart';
@@ -20,11 +22,13 @@ class MapScreen extends StatefulWidget {
     super.key,
     required this.service,
     required this.auth,
+    required this.activeMapController,
     this.startDrawing = false,
   });
 
   final VegetationDataService service;
   final AuthRepository auth;
+  final ActiveMapController activeMapController;
 
   /// Личный кабинет ведёт сразу в режим рисования (кнопка «Создать
   /// полигон» на /account) — на самой карте отдельной кнопки «Нарисовать
@@ -63,6 +67,10 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   void initState() {
     super.initState();
     widget.auth.addListener(_onAuthChanged);
+    // Смена активной карты в переключателе (сайдбар) должна перезагрузить
+    // именно полигоны, а не просто перерисовать экран со старым списком —
+    // у каждой карты свой независимый набор участков.
+    widget.activeMapController.addListener(_load);
     _load();
   }
 
@@ -76,6 +84,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     widget.auth.removeListener(_onAuthChanged);
+    widget.activeMapController.removeListener(_load);
     _mapController.dispose();
     super.dispose();
   }
@@ -95,7 +104,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
       _error = null;
     });
     try {
-      final polygons = await widget.service.getPolygons();
+      final polygons = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
       // Параллельно, а не по одному — на реальном бэкенде с десятками
       // полигонов последовательные await-запросы давали заметную задержку
       // загрузки карты (каждый timeseries — отдельный HTTP-запрос).
@@ -118,7 +127,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         _consumedStartDrawing = true;
         if (_needsLogin) {
           _promptLogin();
-        } else if (mounted) {
+        } else if (mounted && _canDraw) {
           setState(() {
             _drawing = true;
             _draftPoints.clear();
@@ -140,6 +149,15 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   /// кабинет предполагает, что создавать/менять свои полигоны можно
   /// только войдя, независимо от мока/реального API.
   bool get _needsLogin => !widget.auth.isLoggedIn;
+
+  /// Viewer на расшаренной карте видит полигоны, но не может рисовать —
+  /// та же проверка роли, что и на бэкенде (см. `app/api/routes/polygons.py`,
+  /// `_require_edit_access`), только заранее прячет кнопку, а не даёт
+  /// нарваться на 403 после рисования.
+  bool get _canDraw {
+    final active = widget.activeMapController.active;
+    return active == null || mapRoleCanEdit(active.role);
+  }
 
   void _promptLogin() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -220,7 +238,11 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     if (!mounted) return;
     setState(() => _submittingDraft = true);
     try {
-      final polygon = await widget.service.submitCustomPolygon(_draftPoints, label: label);
+      final polygon = await widget.service.submitCustomPolygon(
+        _draftPoints,
+        label: label,
+        mapId: widget.activeMapController.active?.id,
+      );
       if (!mounted) return;
       setState(() {
         _drawing = false;
@@ -282,6 +304,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   Widget build(BuildContext context) {
     return DashboardShell(
       active: DashboardSection.map,
+      activeMapController: widget.activeMapController,
       child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -510,7 +533,7 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
               // было попасть только через кнопку в личном кабинете
               // (`/map?draw=1`), теперь есть и прямой путь, без лишнего
               // перехода на другой экран.
-              if (!_loading && _error == null && !_drawing)
+              if (!_loading && _error == null && !_drawing && _canDraw)
                 Positioned(
                   right: 16,
                   bottom: 16,
@@ -533,12 +556,91 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
             ],
           ),
         ),
+        if (_visiblePolygons.isNotEmpty)
+          _PolygonCarousel(
+            polygons: _visiblePolygons,
+            statusAt: (id) => _pointAt(id, selectedDate)?.status,
+            onTap: (p) => _mapController.move(p.centroid, _mapController.camera.zoom),
+          ),
         TimeSlider(
           dates: _dates,
           index: _dateIndex,
           onChanged: (i) => setState(() => _dateIndex = i),
         ),
       ],
+    );
+  }
+}
+
+/// Горизонтальная карусель участков над временной шкалой — набор карточек
+/// свой у каждой карты (см. `mapId` в `_load()`): переключились на другую
+/// карту в сайдбаре — здесь окажутся её собственные полигоны, а не общий
+/// список. По тапу карта перецентровывается на выбранный участок — быстрый
+/// способ найти нужное поле среди многих, не выцеливая мелкую метку на карте.
+class _PolygonCarousel extends StatelessWidget {
+  const _PolygonCarousel({required this.polygons, required this.statusAt, required this.onTap});
+
+  final List<NdviPolygon> polygons;
+  final NdviStatus? Function(String id) statusAt;
+  final void Function(NdviPolygon) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      color: Theme.of(context).colorScheme.surface,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: polygons.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final p = polygons[i];
+          final status = statusAt(p.id) ?? NdviStatus.normal;
+          return InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => onTap(p),
+            child: Container(
+              width: 132,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: statusColor(status), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          p.cropType,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10.5, color: Theme.of(context).hintColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -586,18 +688,18 @@ class _Legend extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Z-score', style: Theme.of(context).textTheme.labelLarge),
+            Text('Статус участка', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 4),
-            _legendRow(NdviStatus.normal, 'Z ≥ −1'),
-            _legendRow(NdviStatus.suppression, '−2 ≤ Z < −1'),
-            _legendRow(NdviStatus.critical, 'Z < −2'),
+            _legendRow(NdviStatus.normal),
+            _legendRow(NdviStatus.suppression),
+            _legendRow(NdviStatus.critical),
           ],
         ),
       ),
     );
   }
 
-  Widget _legendRow(NdviStatus status, String range) {
+  Widget _legendRow(NdviStatus status) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -609,7 +711,7 @@ class _Legend extends StatelessWidget {
                 BoxDecoration(color: statusColor(status), shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text('${statusLabel(status)} ($range)', style: const TextStyle(fontSize: 11)),
+          Text(statusLabel(status), style: const TextStyle(fontSize: 11)),
         ],
       ),
     );

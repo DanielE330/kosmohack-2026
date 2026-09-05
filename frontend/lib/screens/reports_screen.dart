@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../data/active_map_controller.dart';
 import '../data/auth_repository.dart';
 import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
@@ -24,10 +25,11 @@ class _Row {
 /// реализован (не требуется ТЗ для MVP) — таблица служит именно как отчёт
 /// «на экране», который можно посмотреть или сфотографировать при демо.
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key, required this.service, required this.auth});
+  const ReportsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
   final VegetationDataService service;
   final AuthRepository auth;
+  final ActiveMapController activeMapController;
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -42,12 +44,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void initState() {
     super.initState();
     widget.auth.addListener(_load);
+    widget.activeMapController.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     widget.auth.removeListener(_load);
+    widget.activeMapController.removeListener(_load);
     super.dispose();
   }
 
@@ -67,7 +71,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _error = null;
     });
     try {
-      final polygons = await widget.service.getPolygons();
+      final polygons = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
       final mine = polygons.where((p) => p.isCustom).toList();
       final series = await Future.wait(mine.map((p) => widget.service.getTimeseries(p.id)));
       final allAnomalies = await widget.service.getAnomalies();
@@ -96,6 +100,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final dateFmt = DateFormat('d MMM yyyy', 'ru');
     return DashboardShell(
       active: DashboardSection.reports,
+      activeMapController: widget.activeMapController,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(

@@ -33,7 +33,7 @@ async def test_full_crud_cycle_by_owner(client):
     assert polygon["is_custom"] is True
     polygon_id = polygon["anon_polygon_id"]
 
-    res = await client.get("/polygons")
+    res = await client.get("/polygons", headers=headers)
     assert res.status_code == 200
     assert any(p["anon_polygon_id"] == polygon_id for p in res.json())
 
@@ -47,7 +47,7 @@ async def test_full_crud_cycle_by_owner(client):
     res = await client.delete(f"/polygons/{polygon_id}", headers=headers)
     assert res.status_code == 204
 
-    res = await client.get("/polygons")
+    res = await client.get("/polygons", headers=headers)
     assert all(p["anon_polygon_id"] != polygon_id for p in res.json())
 
 
@@ -95,7 +95,9 @@ async def test_region_returns_existing_polygon_without_calling_overpass(client, 
 
     monkeypatch.setattr(region_search, "fetch_osm_farmland", _fail_if_called)
 
-    res = await client.get("/polygons", params={"region": "46.9,38.9,47.2,39.2"})
+    res = await client.get(
+        "/polygons", params={"region": "46.9,38.9,47.2,39.2"}, headers={"Authorization": f"Bearer {jwt}"}
+    )
     assert res.status_code == 200
     ids = [p["anon_polygon_id"] for p in res.json()]
     assert len(ids) == 1

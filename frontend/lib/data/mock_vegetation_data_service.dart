@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
 import '../models/demo_area.dart';
+import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 import 'vegetation_data_service.dart';
@@ -310,10 +311,13 @@ class MockVegetationDataService implements VegetationDataService {
   List<DemoArea> getDemoAreas() => _areas;
 
   @override
-  Future<List<NdviPolygon>> getPolygons() async => _polygons;
+  Future<List<NdviPolygon>> getPolygons({int? mapId}) async {
+    if (mapId == null) return _polygons;
+    return _polygons.where((p) => p.mapId == mapId).toList();
+  }
 
   @override
-  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label}) async {
+  Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label, int? mapId}) async {
     _customCounter++;
     final id = 'CUSTOM-$_customCounter';
     final centroidLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
@@ -333,6 +337,7 @@ class MockVegetationDataService implements VegetationDataService {
       // `Bad state: No element` при следующей перерисовке карты.
       points: List<LatLng>.from(points),
       isCustom: true,
+      mapId: mapId ?? _defaultMap().id,
     );
     _polygons.add(polygon);
     final series = _generateSeries(nearest.id, seedOffset: 10 + _customCounter);
@@ -360,6 +365,7 @@ class MockVegetationDataService implements VegetationDataService {
       areaId: current.areaId,
       points: points ?? current.points,
       isCustom: current.isCustom,
+      mapId: current.mapId,
     );
     _polygons[index] = updated;
     return updated;
@@ -469,4 +475,64 @@ class MockVegetationDataService implements VegetationDataService {
     if (polygonId != null) return _anomalies[polygonId] ?? [];
     return _anomalies.values.expand((a) => a).toList();
   }
+
+  // --- Карты (шаринг) ---------------------------------------------------
+  //
+  // Мок эмулирует одну демо-сессию, а не несколько реальных аккаунтов
+  // одновременно — поэтому здесь нет второго "пользователя", от лица
+  // которого можно было бы реально проверить, что viewer не может рисовать.
+  // Роль всегда 'owner' для карт, созданных в этой сессии; приглашение по
+  // почте просто запоминает email+роль без проверки, что такой пользователь
+  // существует (на реальном бэкенде — проверяется, см. POST /maps/{id}/invite).
+  final List<_MockMap> _maps = [_MockMap(id: 1, name: 'Личная карта')];
+  int _mapCounter = 1;
+
+  _MockMap _defaultMap() => _maps.first;
+
+  @override
+  Future<List<MapInfo>> getMaps() async =>
+      _maps.map((m) => MapInfo(id: m.id, name: m.name, ownerId: 0, role: MapRole.owner)).toList();
+
+  @override
+  Future<MapInfo> createMap(String name) async {
+    _mapCounter++;
+    final map = _MockMap(id: _mapCounter, name: name);
+    _maps.add(map);
+    return MapInfo(id: map.id, name: map.name, ownerId: 0, role: MapRole.owner);
+  }
+
+  @override
+  Future<List<MapMemberInfo>> getMapMembers(int mapId) async {
+    final map = _maps.firstWhere((m) => m.id == mapId, orElse: () => _defaultMap());
+    return map.members
+        .map((m) => MapMemberInfo(userId: m.email.hashCode, invitedEmail: m.email, role: m.role))
+        .toList();
+  }
+
+  @override
+  Future<MapMemberInfo> inviteToMap(int mapId, {required String email, required MapRole role}) async {
+    final map = _maps.firstWhere(
+      (m) => m.id == mapId,
+      orElse: () => throw Exception('Карта $mapId не найдена'),
+    );
+    map.members.removeWhere((m) => m.email == email);
+    map.members.add((email: email, role: role));
+    return MapMemberInfo(userId: email.hashCode, invitedEmail: email, role: role);
+  }
+
+  @override
+  Future<void> removeMapMember(int mapId, int userId) async {
+    final map = _maps.firstWhere(
+      (m) => m.id == mapId,
+      orElse: () => throw Exception('Карта $mapId не найдена'),
+    );
+    map.members.removeWhere((m) => m.email.hashCode == userId);
+  }
+}
+
+class _MockMap {
+  _MockMap({required this.id, required this.name});
+  final int id;
+  final String name;
+  final List<({String email, MapRole role})> members = [];
 }
