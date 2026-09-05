@@ -1,0 +1,49 @@
+{
+  "rows": 13713,
+  "polygons": 39,
+  "baseline_mean_rmse": 0.09047560022728675,
+  "baseline_linear_rmse": 0.09178826821094284,
+  "baseline_climatology_rmse": 0.1587946097243561,
+  "baseline_rmse": 0.08860827963233711,
+  "oof_rmse": 0.06333449939213387,
+  "oof_gapscore": 11.0,
+  "residual_weight": 1.0499999999999998,
+  "clip_predictions": false,
+  "folds": [
+    {
+      "fold": 0,
+      "polygons": 8,
+      "rows": 2817,
+      "baseline_rmse": 0.08899767821478728,
+      "model_rmse": 0.06579086682696396
+    },
+    {
+      "fold": 1,
+      "polygons": 7,
+      "rows": 2532,
+      "baseline_rmse": 0.08086459258671401,
+      "model_rmse": 0.05822487467071427
+    },
+    {
+      "fold": 2,
+      "polygons": 8,
+      "rows": 2787,
+      "baseline_rmse": 0.08638061306414954,
+      "model_rmse": 0.06251238494727958
+    },
+    {
+      "fold": 3,
+      "polygons": 8,
+      "rows": 2787,
+      "baseline_rmse": 0.09303977072330147,
+      "model_rmse": 0.06555749600684405
+    },
+    {
+      "fold": 4,
+      "polygons": 8,
+      "rows": 2790,
+      "baseline_rmse": 0.09250880109080849,
+      "model_rmse": 0.06413194113876042
+    }
+  ]
+}

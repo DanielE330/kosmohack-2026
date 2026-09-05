@@ -26,6 +26,16 @@ Color statusColor(NdviStatus status) {
   }
 }
 
+/// Ближайшая по дате точка временного ряда — общая логика для карты и
+/// превью на лендинге (обе показывают статус полигона «на момент» даты,
+/// выбранной ползунком).
+NdviPoint? nearestPointAt(List<NdviPoint>? points, DateTime date) {
+  if (points == null || points.isEmpty) return null;
+  return points.reduce(
+    (a, b) => (a.date.difference(date).abs() < b.date.difference(date).abs()) ? a : b,
+  );
+}
+
 String statusLabel(NdviStatus status) {
   switch (status) {
     case NdviStatus.normal:

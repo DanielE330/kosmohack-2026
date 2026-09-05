@@ -71,7 +71,7 @@ Future<void> showSkyTimeAboutDialog(BuildContext context) {
                   ),
                   const _FeatureRow(
                     icon: Icons.warning_amber_rounded,
-                    title: 'Аномалии по Z-score',
+                    title: 'Детекция аномалий',
                     text: 'Штатное развитие / угнетение биомассы / критическая аномалия — '
                         'с объяснением вероятной причины.',
                   ),

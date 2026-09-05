@@ -1,0 +1,64 @@
+{
+  "rows": 13713,
+  "polygons": 39,
+  "crop_weight_map": {
+    "зерновые": 0.8129526257803892,
+    "озимая пшеница": 1.251773962387141,
+    "пастбища/зерновые": 1.7713983805590054,
+    "подсолнечник": 0.2
+  },
+  "base_oof_rmse": 0.06264553726002592,
+  "ensemble_oof_rmse": 0.06252790463369744,
+  "base_weighted_oof_rmse": 0.06378379002841622,
+  "ensemble_weighted_oof_rmse": 0.06363780263717704,
+  "regular_improvement": 0.00011763262632848159,
+  "weighted_improvement": 0.00014598739123918014,
+  "residual_weight": 1.15,
+  "blend_weight": 0.25,
+  "clip_predictions": true,
+  "improved_weighted_folds": 5,
+  "improved_regular_folds": 4,
+  "accepted": true,
+  "folds": [
+    {
+      "fold": 0,
+      "rows": 2817,
+      "base_weighted_rmse": 0.06592336400155835,
+      "ensemble_weighted_rmse": 0.06571629752524578,
+      "base_rmse": 0.06534397835152221,
+      "ensemble_rmse": 0.06518259218642895
+    },
+    {
+      "fold": 1,
+      "rows": 2532,
+      "base_weighted_rmse": 0.055008536248713616,
+      "ensemble_weighted_rmse": 0.054995941301582286,
+      "base_rmse": 0.0572872764842066,
+      "ensemble_rmse": 0.057367754700791085
+    },
+    {
+      "fold": 2,
+      "rows": 2787,
+      "base_weighted_rmse": 0.0632006393467511,
+      "ensemble_weighted_rmse": 0.06297885574021621,
+      "base_rmse": 0.061909644685875245,
+      "ensemble_rmse": 0.06168783171048242
+    },
+    {
+      "fold": 3,
+      "rows": 2787,
+      "base_weighted_rmse": 0.06797844894551945,
+      "ensemble_weighted_rmse": 0.06777148199018103,
+      "base_rmse": 0.06504042023792551,
+      "ensemble_rmse": 0.06486454766900684
+    },
+    {
+      "fold": 4,
+      "rows": 2790,
+      "base_weighted_rmse": 0.0655495487763579,
+      "ensemble_weighted_rmse": 0.06550546883189412,
+      "base_rmse": 0.06280963771495743,
+      "ensemble_rmse": 0.06273581315567205
+    }
+  ]
+}

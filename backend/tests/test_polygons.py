@@ -33,7 +33,7 @@ async def test_full_crud_cycle_by_owner(client):
     assert polygon["is_custom"] is True
     polygon_id = polygon["anon_polygon_id"]
 
-    res = await client.get("/polygons")
+    res = await client.get("/polygons", headers=headers)
     assert res.status_code == 200
     assert any(p["anon_polygon_id"] == polygon_id for p in res.json())
 
@@ -47,7 +47,7 @@ async def test_full_crud_cycle_by_owner(client):
     res = await client.delete(f"/polygons/{polygon_id}", headers=headers)
     assert res.status_code == 204
 
-    res = await client.get("/polygons")
+    res = await client.get("/polygons", headers=headers)
     assert all(p["anon_polygon_id"] != polygon_id for p in res.json())
 
 

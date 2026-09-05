@@ -11,44 +11,60 @@ void main() {
     service = MockVegetationDataService();
   });
 
-  test('exposes field polygons for all three demo areas', () async {
+  test('starts with three non-custom demo polygons (for the landing preview), no custom ones',
+      () async {
     final polygons = await service.getPolygons();
-    expect(polygons.length, 6);
-    expect(polygons.map((p) => p.areaId).toSet(), {
+    expect(polygons.length, 3);
+    expect(polygons.every((p) => !p.isCustom), isTrue,
+        reason: 'seeded demo polygons must not show up as "мои полигоны"');
+  });
+
+  test('still exposes the three reference areas for crop-type lookup', () {
+    final areas = service.getDemoAreas();
+    expect(areas.map((a) => a.id).toSet(), {
       'rostov-wheat',
       'krasnodar-sunflower',
       'stavropol-pasture',
     });
   });
 
-  test('each polygon has a ~2-year time series with some restored points',
+  test('each hand-drawn polygon has a ~2-year time series with some restored points',
       () async {
-    final polygons = await service.getPolygons();
-    for (final polygon in polygons) {
-      final points = await service.getTimeseries(polygon.id);
-      expect(points.length, greaterThan(80));
-      expect(points.every((p) => p.value >= 0 && p.value <= 1), isTrue);
-      expect(points.any((p) => p.isRestored), isTrue,
-          reason: 'gap-filling must be exercised for the demo');
-    }
+    final polygon = await service.submitCustomPolygon(const [
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.1),
+      LatLng(47.6, 40.1),
+      LatLng(47.6, 40.0),
+    ]);
+    final points = await service.getTimeseries(polygon.id);
+    expect(points.length, greaterThan(80));
+    expect(points.every((p) => p.value >= 0 && p.value <= 1), isTrue);
+    expect(points.any((p) => p.isRestored), isTrue,
+        reason: 'gap-filling must be exercised for the demo');
   });
 
-  test('each polygon has at least one detected anomaly', () async {
-    final polygons = await service.getPolygons();
-    for (final polygon in polygons) {
-      final anomalies = await service.getAnomalies(polygonId: polygon.id);
-      expect(anomalies, isNotEmpty,
-          reason: '${polygon.id} must reliably show an anomaly for the demo');
-    }
+  test('a hand-drawn polygon reliably shows a detected anomaly', () async {
+    final polygon = await service.submitCustomPolygon(const [
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.1),
+      LatLng(47.6, 40.1),
+      LatLng(47.6, 40.0),
+    ]);
+    final anomalies = await service.getAnomalies(polygonId: polygon.id);
+    expect(anomalies, isNotEmpty,
+        reason: '${polygon.id} must reliably show an anomaly for the demo');
   });
 
   test('anomaly severities follow the spec\'s Z-score thresholds', () async {
-    final polygons = await service.getPolygons();
-    for (final polygon in polygons) {
-      final points = await service.getTimeseries(polygon.id);
-      for (final p in points) {
-        expect(p.status, ndviStatusForZ(p.zScore));
-      }
+    final polygon = await service.submitCustomPolygon(const [
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.1),
+      LatLng(47.6, 40.1),
+      LatLng(47.6, 40.0),
+    ]);
+    final points = await service.getTimeseries(polygon.id);
+    for (final p in points) {
+      expect(p.status, ndviStatusForZ(p.zScore));
     }
   });
 
@@ -82,17 +98,21 @@ void main() {
     expect(await service.getAnomalies(polygonId: polygon.id), isEmpty);
   });
 
-  test('findPolygonsInRegion returns already-known polygons inside the bbox',
+  test('findPolygonsInRegion returns an already-known (user-drawn) polygon inside the bbox',
       () async {
-    // Ростовская область — оба демо-полигона в пределах ~0.03°.
+    final drawn = await service.submitCustomPolygon(const [
+      LatLng(47.5, 40.0),
+      LatLng(47.5, 40.02),
+      LatLng(47.52, 40.02),
+      LatLng(47.52, 40.0),
+    ]);
     final found = await service.findPolygonsInRegion(
       minLat: 47.4,
       minLon: 39.9,
       maxLat: 47.6,
       maxLon: 40.1,
     );
-    expect(found, isNotEmpty);
-    expect(found.every((p) => p.areaId == 'rostov-wheat'), isTrue);
+    expect(found.any((p) => p.id == drawn.id), isTrue);
   });
 
   test('findPolygonsInRegion auto-discovers contours for an empty area',

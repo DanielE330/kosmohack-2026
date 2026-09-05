@@ -42,3 +42,19 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Пользователь не найден")
     return user
+
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Как [get_current_user], но `None` вместо 401 без токена/с невалидным
+    токеном — нужно там, где часть ответа публична (открытые сидовые
+    полигоны датасета), а часть видна только вошедшим (свои карты)."""
+    if credentials is None:
+        return None
+    email = decode_access_token(credentials.credentials)
+    if email is None:
+        return None
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()

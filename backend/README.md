@@ -100,17 +100,20 @@ python -m inference.run_inference --input private_features.csv --output submissi
 подключении реальной ML-модели меняется только эта функция, а не сам скрипт
 и не веб-сервис.
 
-## Что здесь mock/baseline и куда встраивать реальную модель
+## ML и baseline-fallback
 
-- **`app/services/gapfill.interpolate`** — линейная интерполяция между
-  ближайшими известными наблюдениями. Сигнатура `(dates, values) ->
-  predicted` используется и веб-API, и `inference/run_inference.py` —
-  замените реализацию на Savitzky-Golay/Whittaker/ML, вызывающий код не
-  меняется.
-- **`app/services/anomaly_detection.explain_anomaly`** — эвристика по
-  ERA5 (осадки/температура) для текстового поля `explanation`. Пороги
-  Z-score (`status_for_zscore`) зафиксированы в ТЗ и продублированы во
-  Flutter — их менять нельзя без синхронизации фронта.
+- **`app/services/ml_bridge.py`** подключает обученные модели из `../ml/src`
+  (абсолютный путь, не зависит от текущей директории запуска). Если модель/
+  зависимости недоступны (`ML_AVAILABLE=False`) — веб-сервис не падает, а
+  прозрачно переключается на baseline: `app/services/gapfill.interpolate`
+  (линейная интерполяция) и эвристику по ERA5 в
+  `app/services/anomaly_detection._explain_anomaly_heuristic`. Проверить,
+  что реально используется ML, а не fallback — смотреть, что `explanation`
+  в ответе `/anomalies` содержит конкретную категорию причины (например,
+  «тепловой стресс и засуха»), а не общую фразу «Устойчивое отклонение NDVI
+  от климатической нормы» (это и есть текст fallback-эвристики).
+- Пороги Z-score (`status_for_zscore`) зафиксированы в ТЗ и продублированы
+  во Flutter — их менять нельзя без синхронизации фронта.
 - **Координаты AOI датасета соревнования** (`AOI-0002`…) в
   `train_dataset.csv` отсутствуют — `app/ingestion/load_train_dataset.py`
   генерирует детерминированный синтетический контур
@@ -127,15 +130,22 @@ python -m inference.run_inference --input private_features.csv --output submissi
 
 Регистрация требует подтверждения почты, прежде чем можно будет войти:
 
-1. `POST /auth/register` — создаёт пользователя (`is_email_confirmed=false`)
-   и возвращает `email_confirmation_token` **прямо в ответе**. Это временная
-   замена реальной отправки письма — почтовый сервис ещё не подключён (см.
-   `tasks/backend.md`). Когда подключим — токен перестанет отдаваться
-   в ответе и будет только приходить на почту.
+1. `POST /auth/register` — создаёт пользователя (`is_email_confirmed=false`),
+   отправляет письмо со ссылкой подтверждения (SMTP, см. `app/services/
+   email.py`) и **дополнительно** возвращает `email_confirmation_token`
+   прямо в ответе — подстраховка на случай, если письмо задержится/не
+   дойдёт (провайдер может блокировать новые SMTP-аккаунты до ручной
+   активации, см. `tasks/backend.md`).
 2. `POST /auth/confirm-email {"token": "..."}` — подтверждает почту и сразу
    возвращает JWT.
 3. `POST /auth/login` — обычный вход; вернёт `403`, если почта ещё не
    подтверждена.
+4. `POST /auth/change-password {"old_password", "new_password"}` — требует
+   JWT, меняет пароль текущего пользователя.
+5. `POST /auth/change-email {"new_email", "password"}` — требует JWT,
+   меняет почту и сбрасывает `is_email_confirmed` (нужно подтвердить заново
+   через `/auth/confirm-email`), возвращает новый токен подтверждения тем
+   же способом, что и `/auth/register`.
 
 ## Переменные окружения
 
