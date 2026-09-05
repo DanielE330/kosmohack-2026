@@ -110,13 +110,13 @@ class _AccountScreenState extends State<AccountScreen> {
                       context.push('/login');
                       return;
                     }
-                    context.go('/?draw=1');
+                    context.go('/map?draw=1');
                   },
                   icon: const Icon(Icons.add_location_alt_outlined),
                   label: const Text('Создать полигон'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => context.go('/'),
+                  onPressed: () => context.go('/map'),
                   icon: const Icon(Icons.map_outlined),
                   label: const Text('Посмотреть все на карте'),
                 ),

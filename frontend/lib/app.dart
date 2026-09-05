@@ -7,6 +7,7 @@ import 'models/ndvi_polygon.dart';
 import 'route_observer.dart';
 import 'screens/account_screen.dart';
 import 'screens/confirm_email_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/polygon_detail_screen.dart';
@@ -30,11 +31,10 @@ class KosmohackApp extends StatelessWidget {
       routes: [
         GoRoute(
           path: '/',
-          // Демо (моковые данные, если бэкенд не подключён через
-          // --dart-define=API_BASE_URL) открывается сразу на корне — без
-          // отдельного лендинга и клика «Попробовать демо». Описание
-          // проекта доступно из карты по кнопке «О проекте», не блокируя
-          // доступ к самой карте.
+          builder: (context, state) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/map',
           builder: (context, state) => MapScreen(
             service: service,
             auth: auth,
