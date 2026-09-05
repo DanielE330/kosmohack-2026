@@ -41,7 +41,15 @@ abstract class AuthRepository extends ChangeNotifier {
 
   void logout();
 
-  Future<void> changePassword({required String oldPassword, required String newPassword});
+  /// Новый пароль не применяется сразу — вступает в силу только после
+  /// [confirmPasswordChange] с токеном, который тут возвращается (тот же
+  /// принцип, что и у [changeEmail]: письмо со ссылкой дублирует токен,
+  /// но не заменяет его — сессия/JWT при этом не трогается, в отличие от
+  /// смены почты, так что дожидаться подтверждения прямо на этом экране
+  /// не обязательно).
+  Future<String> changePassword({required String oldPassword, required String newPassword});
+
+  Future<void> confirmPasswordChange(String token);
 
   /// Смена email требует повторного подтверждения — сразу после вызова
   /// текущий токен становится недействительным (как и на бэкенде), новый

@@ -22,4 +22,12 @@ class User(Base):
     is_email_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     email_confirmation_token: Mapped[str | None] = mapped_column(String(64))
 
+    # Смена пароля требует подтверждения по почте (как и смена email) —
+    # новый пароль хранится захэшированным здесь до подтверждения, а не
+    # прямо в `hashed_password`, чтобы неподтверждённая смена не могла
+    # случайно вступить в силу. Только одна незавершённая смена может
+    # существовать одновременно — новый запрос перезаписывает предыдущий.
+    pending_password_hash: Mapped[str | None] = mapped_column(String(255))
+    password_change_token: Mapped[str | None] = mapped_column(String(64))
+
     polygons: Mapped[list["Polygon"]] = relationship(back_populates="owner")

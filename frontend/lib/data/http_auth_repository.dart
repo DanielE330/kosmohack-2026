@@ -108,11 +108,23 @@ class HttpAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<void> changePassword({required String oldPassword, required String newPassword}) async {
+  Future<String> changePassword({required String oldPassword, required String newPassword}) async {
     final res = await _client.post(
       _uri('/auth/change-password'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $_token'},
       body: jsonEncode({'old_password': oldPassword, 'new_password': newPassword}),
+    );
+    if (res.statusCode != 200) throw Exception(_extractError(res));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return data['password_change_token'] as String;
+  }
+
+  @override
+  Future<void> confirmPasswordChange(String token) async {
+    final res = await _client.post(
+      _uri('/auth/confirm-password-change'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token}),
     );
     if (res.statusCode != 204) throw Exception(_extractError(res));
   }

@@ -9,14 +9,16 @@ from app.models.user import User
 from app.schemas.auth import (
     ChangeEmailRequest,
     ChangePasswordRequest,
+    ChangePasswordResponse,
     ConfirmEmailRequest,
+    ConfirmPasswordChangeRequest,
     LoginRequest,
     RegisterResponse,
     Token,
 )
 from app.schemas.user import UserCreate
 from app.security import create_access_token, hash_password, verify_password
-from app.services.email import send_confirmation_email
+from app.services.email import send_confirmation_email, send_password_change_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -82,17 +84,48 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
 
 @router.post(
     "/change-password",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Сменить пароль текущего пользователя",
+    response_model=ChangePasswordResponse,
+    summary="Запросить смену пароля — вступает в силу только после подтверждения по почте",
 )
 async def change_password(
     payload: ChangePasswordRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> ChangePasswordResponse:
+    # Текущий пароль проверяется сейчас, а не в момент подтверждения — иначе
+    # пришлось бы заново запрашивать его на экране подтверждения. Значит, у
+    # того, кто уже вошёл в открытую вкладку, есть то же окно для смены
+    # пароля, что и сегодня (до этой фичи) — осознанное упрощение, а не
+    # недосмотр.
     if not verify_password(payload.old_password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный текущий пароль")
-    user.hashed_password = hash_password(payload.new_password)
+
+    # Новый запрос перезаписывает предыдущий незавершённый — подтвердить
+    # можно только самую последнюю запрошенную смену.
+    token = secrets.token_urlsafe(24)
+    user.pending_password_hash = hash_password(payload.new_password)
+    user.password_change_token = token
+    await db.commit()
+    send_password_change_email(user.email, token)
+    return ChangePasswordResponse(password_change_token=token)
+
+
+@router.post(
+    "/confirm-password-change",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Подтвердить смену пароля токеном из /auth/change-password",
+)
+async def confirm_password_change(
+    payload: ConfirmPasswordChangeRequest, db: AsyncSession = Depends(get_db)
+) -> None:
+    result = await db.execute(select(User).where(User.password_change_token == payload.token))
+    user = result.scalar_one_or_none()
+    if user is None or user.pending_password_hash is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Неверный или уже использованный токен")
+
+    user.hashed_password = user.pending_password_hash
+    user.pending_password_hash = None
+    user.password_change_token = None
     await db.commit()
 
 
