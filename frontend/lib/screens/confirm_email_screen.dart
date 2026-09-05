@@ -53,7 +53,7 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
       _error = null;
     });
     try {
-      await widget.auth.confirmEmail(token);
+      await widget.auth.confirmEmail(token, email: widget.prefillEmail);
       if (!mounted) return;
       context.go('/map');
     } catch (e) {

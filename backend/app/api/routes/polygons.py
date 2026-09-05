@@ -9,7 +9,7 @@ from app.api.deps import get_current_user, get_db, get_http_client
 from app.models.polygon import Polygon
 from app.models.user import User
 from app.schemas.polygon import PolygonCreate, PolygonOut, PolygonUpdate
-from app.services import region_search
+from app.services import gee_bridge, region_search
 
 router = APIRouter(tags=["polygons"])
 
@@ -74,6 +74,34 @@ async def list_polygons(
     for polygon in new_polygons:
         await db.refresh(polygon)
     return new_polygons
+
+
+@router.get(
+    "/polygons/{polygon_id}/live-sources",
+    summary="Живые данные Sentinel-2/Landsat/MODIS/ERA5 из Google Earth Engine за период",
+)
+async def get_live_sources(
+    polygon_id: str,
+    date_from: str = Query(..., description="YYYY-MM-DD", examples=["2024-01-01"]),
+    date_to: str = Query(..., description="YYYY-MM-DD", examples=["2024-06-01"]),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """В отличие от `/timeseries/{id}` (восстановленный ряд по историческому
+    `train_dataset.csv`), это реальный живой запрос к нескольким спутниковым
+    источникам и погоде — демонстрирует автоматический сбор данных из
+    нескольких источников, а не только офлайн-модель. Если GEE не настроен
+    на сервере (нет учётных данных/проекта) или сам GEE недоступен —
+    отдаёт понятную 503, а не падает и не отдаёт частичный мусор."""
+    polygon = await db.get(Polygon, polygon_id)
+    if polygon is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
+    try:
+        points = [(p[0], p[1]) for p in polygon.points]
+        return gee_bridge.fetch_live_sources(points, date_from, date_to)
+    except gee_bridge.GEEUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post(

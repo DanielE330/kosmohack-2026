@@ -18,6 +18,12 @@ abstract class AuthRepository extends ChangeNotifier {
   String? get email;
   bool get isLoggedIn => token != null;
 
+  /// Восстанавливает сессию после перезагрузки страницы (если была
+  /// сохранена) — без этого JWT/логин жили только в памяти, и обычный
+  /// F5 разлогинивал пользователя, хотя на реальном бэкенде его полигоны
+  /// никуда не делись. Вызывается один раз в `main()` до `runApp`.
+  Future<void> init() async {}
+
   Future<RegistrationResult> register({
     required String email,
     required String password,
@@ -25,7 +31,11 @@ abstract class AuthRepository extends ChangeNotifier {
   });
 
   /// Подтверждает почту и сразу возвращает JWT — как и реальный бэкенд.
-  Future<void> confirmEmail(String token);
+  /// [email] — не уходит на сервер (эндпоинт его не принимает), только для
+  /// локального состояния (`this.email`, персистентность сессии): сам ответ
+  /// `/auth/confirm-email` email не возвращает, а экран его уже знает
+  /// из query-параметра `?email=` после регистрации/смены почты.
+  Future<void> confirmEmail(String token, {String? email});
 
   Future<void> login({required String email, required String password});
 
