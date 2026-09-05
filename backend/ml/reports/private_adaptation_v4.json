@@ -1,0 +1,9 @@
+{
+  "submission_rows": 3112,
+  "calibration_rows": 10576,
+  "polygons": 78,
+  "adapted_polygons": 78,
+  "fallback_polygons": 0,
+  "mean_abs_v4_minus_v3": 0.005672483728853308,
+  "max_abs_v4_minus_v3": 0.03300000000000003
+}
