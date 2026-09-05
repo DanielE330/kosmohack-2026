@@ -1,9 +1,14 @@
 """GET /polygons/{id}/live-sources — живой сбор данных из Google Earth
 Engine (Sentinel-2/Landsat/MODIS/ERA5), см. app/services/gee_bridge.py.
-Тесты не ходят в реальный GEE (нет кредов в CI) — проверяют только, что
-без настроенного `EARTHENGINE_PROJECT` сервис отдаёт понятную 503, а не
-падает и не отдаёт частичный мусор (см. критерий «устойчивость к частичной
-недоступности данных»)."""
+Тесты не ходят в реальный GEE — проверяют только, что без настроенного
+`EARTHENGINE_PROJECT` сервис отдаёт понятную 503, а не падает и не отдаёт
+частичный мусор (см. критерий «устойчивость к частичной недоступности
+данных»). `settings.earthengine_project` принудительно обнуляется на
+время теста через monkeypatch — иначе тест был бы завязан на то, задан
+ли реальный `EARTHENGINE_PROJECT` в окружении, где реально гоняются тесты
+(на проде он есть, в песочнице разработчика — как повезёт)."""
+
+from app.config import settings
 
 _POINTS = [[47.0, 39.0], [47.0, 39.1], [47.1, 39.1]]
 
@@ -24,7 +29,8 @@ async def _create_polygon(client) -> str:
     return created.json()["anon_polygon_id"]
 
 
-async def test_live_sources_without_gee_config_returns_503(client):
+async def test_live_sources_without_gee_config_returns_503(client, monkeypatch):
+    monkeypatch.setattr(settings, "earthengine_project", None)
     polygon_id = await _create_polygon(client)
     res = await client.get(
         f"/polygons/{polygon_id}/live-sources",
