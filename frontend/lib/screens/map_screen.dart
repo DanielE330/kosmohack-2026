@@ -61,7 +61,6 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   bool _submittingDraft = false;
 
   final MapController _mapController = MapController();
-  bool _searchingRegion = false;
   bool _consumedStartDrawing = false;
 
   @override
@@ -148,6 +147,17 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
   NdviPoint? _pointAt(String polygonId, DateTime date) =>
       nearestPointAt(_timeseries[polygonId], date);
 
+  /// Контур для `PolygonLayer` — рисуется всегда, даже когда для выбранной
+  /// даты нет наблюдения (гэп, свежий полигон без backfill, дата вне
+  /// диапазона временного ряда). Раньше в этом случае полигон целиком
+  /// пропадал с карты; теперь вместо цвета статуса — нейтральный серый.
+  Polygon _polygonFor(NdviPolygon p, DateTime date) {
+    final status = _pointAt(p.id, date)?.status;
+    final fill = status == null ? Colors.grey.withValues(alpha: 0.35) : statusColor(status).withValues(alpha: 0.45);
+    final border = status == null ? Colors.grey : statusColor(status);
+    return Polygon(points: p.points, color: fill, borderColor: border, borderStrokeWidth: 2);
+  }
+
   /// Раньше проверялось только для реального бэкенда — теперь личный
   /// кабинет предполагает, что создавать/менять свои полигоны можно
   /// только войдя, независимо от мока/реального API.
@@ -169,6 +179,27 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         action: SnackBarAction(label: 'Войти', onPressed: () => context.go('/login')),
       ),
     );
+  }
+
+  /// Начинает рисование нового полигона. Один метод на кнопку в шапке и
+  /// на кнопку поверх карты, чтобы поведение (в т.ч. подсказка про вход)
+  /// не разъезжалось между ними.
+  void _startDrawing() {
+    if (_needsLogin) {
+      _promptLogin();
+      return;
+    }
+    if (!_canDraw) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('На этой карте у вас права только на просмотр')),
+      );
+      return;
+    }
+    setState(() {
+      _drawing = true;
+      _draftPoints.clear();
+      _redoPoints.clear();
+    });
   }
 
   /// Отменяет уже идущее рисование.
@@ -263,46 +294,6 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
     }
   }
 
-  /// Автопоиск доступных сельхозконтуров в границах текущего вида карты —
-  /// критерий «Управление полигонами» требует это отдельно от ручного
-  /// рисования (см. tasks/backend.md, GET /polygons?region=).
-  Future<void> _searchRegion() async {
-    final bounds = _mapController.camera.visibleBounds;
-    setState(() => _searchingRegion = true);
-    try {
-      final found = await widget.service.findPolygonsInRegion(
-        minLat: bounds.south,
-        minLon: bounds.west,
-        maxLat: bounds.north,
-        maxLon: bounds.east,
-      );
-      final foundSeries = await Future.wait(found.map((p) => widget.service.getTimeseries(p.id)));
-      for (var i = 0; i < found.length; i++) {
-        _timeseries[found[i].id] = foundSeries[i];
-      }
-      final knownIds = _polygons.map((p) => p.id).toSet();
-      if (!mounted) return;
-      setState(() {
-        _polygons = [..._polygons, ...found.where((p) => !knownIds.contains(p.id))];
-        _revealedIds.addAll(found.map((p) => p.id));
-        _searchingRegion = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(found.isEmpty
-              ? 'В этой области контуры не найдены'
-              : 'Найдено контуров: ${found.length}'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _searchingRegion = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось выполнить поиск: $e')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return DashboardShell(
@@ -317,16 +308,14 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
         ),
         title: SkyTimeLogo(height: 20, color: Theme.of(context).colorScheme.onPrimary),
         actions: [
+          // Кнопка в шапке, а не только FAB поверх карты: FAB прячется на
+          // время загрузки и у пользователя с правами «только просмотр», и
+          // добавить полигон было неоткуда — приходилось искать вход через
+          // личный кабинет.
           IconButton(
-            icon: _searchingRegion
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.travel_explore),
-            tooltip: 'Найти контуры полей в этой области',
-            onPressed: (_loading || _searchingRegion) ? null : _searchRegion,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            tooltip: 'Добавить полигон',
+            onPressed: _drawing ? null : _startDrawing,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -444,15 +433,13 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                   ),
                   PolygonLayer(
                     polygons: [
-                      for (final p in _visiblePolygons)
-                        if (_pointAt(p.id, selectedDate) != null)
-                          Polygon(
-                            points: p.points,
-                            color: statusColor(_pointAt(p.id, selectedDate)!.status)
-                                .withValues(alpha: 0.45),
-                            borderColor: statusColor(_pointAt(p.id, selectedDate)!.status),
-                            borderStrokeWidth: 2,
-                          ),
+                      // Контур рисуем всегда для каждого видимого полигона —
+                      // раньше при отсутствии точки ровно на selectedDate
+                      // (гэп в данных, свежесозданный полигон без backfill,
+                      // дата вне диапазона наблюдений) контур пропадал с
+                      // карты целиком. Вместо этого при отсутствии данных на
+                      // дату красим нейтральным серым, а не прячем полигон.
+                      for (final p in _visiblePolygons) _polygonFor(p, selectedDate),
                       if (_draftPoints.length >= 2)
                         Polygon(
                           points: _draftPoints,
@@ -541,19 +528,9 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
                   right: 16,
                   bottom: 16,
                   child: FloatingActionButton.extended(
-                    onPressed: () {
-                      if (_needsLogin) {
-                        _promptLogin();
-                        return;
-                      }
-                      setState(() {
-                        _drawing = true;
-                        _draftPoints.clear();
-                        _redoPoints.clear();
-                      });
-                    },
+                    onPressed: _startDrawing,
                     icon: const Icon(Icons.add_location_alt_outlined),
-                    label: const Text('Создать полигон'),
+                    label: const Text('Добавить полигон'),
                   ),
                 ),
             ],

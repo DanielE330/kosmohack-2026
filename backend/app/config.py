@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     sql_echo: bool = False
 
+    # Витринные аккаунты для показа продукта заводятся на старте
+    # (app/services/demo_seed.py). Флаг — чтобы боевой стенд мог их
+    # выключить: пароли у них публичные и лежат прямо в репозитории.
+    seed_demo_accounts: bool = True
+
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_login: str | None = None

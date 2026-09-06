@@ -63,34 +63,40 @@ class MapSwitcher extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final active = controller.active;
+        // Цвета из темы, а не хардкодом cream/navy: в тёмной теме
+        // кремовая «таблетка» выпадала из сайдбара как чужеродная.
+        final scheme = Theme.of(context).colorScheme;
         return Row(
           children: [
             Expanded(
               child: InkWell(
                 onTap: () => _openMenu(context),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
+                hoverColor: SkyTimeColors.teal.withValues(alpha: 0.10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   decoration: BoxDecoration(
-                    color: SkyTimeColors.cream,
-                    borderRadius: BorderRadius.circular(12),
+                    color: scheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
+                    border: Border.all(color: scheme.outlineVariant),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.map_outlined, size: 18, color: SkyTimeColors.navy),
+                      const Icon(Icons.map_outlined, size: 18, color: SkyTimeColors.teal),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           active?.name ?? (controller.loading ? 'Загрузка…' : 'Нет карт'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
-                            color: SkyTimeColors.navy,
+                            color: scheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Icon(Icons.unfold_more, size: 16, color: SkyTimeColors.navy),
+                      Icon(Icons.unfold_more,
+                          size: 16, color: scheme.onSurface.withValues(alpha: 0.6)),
                     ],
                   ),
                 ),
@@ -107,8 +113,12 @@ class MapSwitcher extends StatelessWidget {
                 icon: const Icon(Icons.share_outlined, size: 18),
                 tooltip: 'Поделиться картой',
                 style: IconButton.styleFrom(
-                  backgroundColor: SkyTimeColors.cream,
-                  foregroundColor: SkyTimeColors.navy,
+                  backgroundColor: scheme.surfaceContainerHigh,
+                  foregroundColor: scheme.onSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
+                    side: BorderSide(color: scheme.outlineVariant),
+                  ),
                 ),
               ),
             ],

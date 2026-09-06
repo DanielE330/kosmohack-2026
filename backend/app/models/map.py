@@ -30,6 +30,14 @@ class Map(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Ссылка «поделиться»: неугадываемый токен, который заводится только по
+    # явному действию владельца/редактора (`POST /polygons/{id}/share-link`).
+    # Нужен потому, что `MapMember` привязывает доступ к конкретному
+    # аккаунту, а отправленная ссылка обычно открывается вообще без входа —
+    # и получатель видел бы «Полигон не найден» вместо участка. Пока токен
+    # не выдан (`None`), карта по-прежнему видна строго владельцу и
+    # приглашённым.
+    share_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, default=None)
 
     owner: Mapped["User"] = relationship()
     members: Mapped[list["MapMember"]] = relationship(back_populates="map", cascade="all, delete-orphan")

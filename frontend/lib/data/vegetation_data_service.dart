@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:latlong2/latlong.dart';
 
 import '../models/anomaly.dart';
@@ -11,6 +13,10 @@ typedef PolygonsWithTimeseries = ({
   List<NdviPolygon> polygons,
   Map<String, List<NdviPoint>> timeseries,
 });
+
+/// Готовый к сохранению файл (см. [VegetationDataService.exportExcel]):
+/// байты как есть с бэкенда, имя и MIME-тип — из заголовков ответа.
+typedef ExportedFile = ({String filename, Uint8List bytes, String mimeType});
 
 /// Контракт, соответствующий реальной схеме данных соревнования (по ТЗ):
 ///   GET    /polygons?region={bbox}           -> открытые контуры AOI (OSM/ESA WorldCereal);
@@ -42,6 +48,18 @@ abstract class VegetationDataService {
   /// [mapId] — только полигоны этой карты (нужен доступ); без него — все,
   /// что видно текущему пользователю (открытые + свои/расшаренные карты).
   Future<List<NdviPolygon>> getPolygons({int? mapId});
+
+  /// Один полигон по id — то, что нужно экрану участка, открытому по
+  /// прямой ссылке: в [getPolygons] его может не быть (список ограничен
+  /// правами), а тут доступ проверяет бэкенд. [shareToken] — токен из
+  /// ссылки «поделиться» (`?share=...`), по которому участок открывается
+  /// и без входа; см. [createShareLinkToken].
+  Future<NdviPolygon> getPolygon(String polygonId, {String? shareToken});
+
+  /// Токен для ссылки «поделиться этим участком» — `null`, если полигон и
+  /// так открыт всем (сидовые контуры датасета) и токен не нужен. Выдаётся
+  /// только тому, кто может менять карту участка.
+  Future<String?> createShareLinkToken(String polygonId);
 
   /// То же, что [getPolygons] плюс [getTimeseries] на каждый из них, одним
   /// вызовом. Экрану карты нужен весь ряд каждого полигона сразу (общий для
@@ -86,4 +104,14 @@ abstract class VegetationDataService {
 
   Future<List<NdviPoint>> getTimeseries(String polygonId);
   Future<List<Anomaly>> getAnomalies({String? polygonId});
+
+  /// Готовый Excel-отчёт по участкам: один участок — `.xlsx`, несколько —
+  /// `.zip` с отдельной книгой на участок (см. backend `/export/...`).
+  /// Файл собирает бэкенд, а не клиент: только там есть все поля
+  /// наблюдения (ряды Sentinel-2/Landsat/MODIS, ERA5, климатическая норма)
+  /// и периоды аномалий.
+  ///
+  /// `null` — выгрузка недоступна в этой реализации (демо-режим без
+  /// бэкенда), тогда UI откатывается на CSV, собранный на клиенте.
+  Future<ExportedFile?> exportExcel(List<String> polygonIds);
 }

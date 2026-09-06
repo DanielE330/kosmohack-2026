@@ -164,3 +164,65 @@ async def test_owner_can_revoke_member_access(client):
 
     res = await client.get("/polygons", params={"map_id": map_id}, headers=_auth(member_jwt))
     assert res.status_code == 404
+
+
+async def test_polygon_link_opens_only_for_those_with_access(client):
+    """Ссылка на участок чужой карты: без доступа — не отдаём, приглашённому
+    — отдаём. Именно на этом ломался экран участка, открытый по присланной
+    ссылке (см. `_PolygonRoute` во фронтенде)."""
+    owner_jwt = await _register_and_confirm(client, "link-owner@example.com")
+    guest_jwt = await _register_and_confirm(client, "link-guest@example.com")
+
+    res = await client.post("/maps", json={"name": "Карта со ссылкой"}, headers=_auth(owner_jwt))
+    map_id = res.json()["id"]
+    res = await client.post(
+        "/polygons/custom", json={"points": _POINTS, "map_id": map_id}, headers=_auth(owner_jwt)
+    )
+    polygon_id = res.json()["anon_polygon_id"]
+
+    # Аноним — 401 (фронт предложит войти), вошедший чужак — 404.
+    assert (await client.get(f"/polygons/{polygon_id}")).status_code == 401
+    assert (await client.get(f"/polygons/{polygon_id}", headers=_auth(guest_jwt))).status_code == 404
+
+    await client.post(
+        f"/maps/{map_id}/invite",
+        json={"email": "link-guest@example.com", "role": "viewer"},
+        headers=_auth(owner_jwt),
+    )
+    res = await client.get(f"/polygons/{polygon_id}", headers=_auth(guest_jwt))
+    assert res.status_code == 200
+    assert res.json()["anon_polygon_id"] == polygon_id
+
+
+async def test_share_link_token_opens_polygon_without_login(client):
+    owner_jwt = await _register_and_confirm(client, "share-owner@example.com")
+    other_jwt = await _register_and_confirm(client, "share-other@example.com")
+
+    res = await client.post("/maps", json={"name": "Карта по ссылке"}, headers=_auth(owner_jwt))
+    map_id = res.json()["id"]
+    res = await client.post(
+        "/polygons/custom", json={"points": _POINTS, "map_id": map_id}, headers=_auth(owner_jwt)
+    )
+    polygon_id = res.json()["anon_polygon_id"]
+
+    # Чужой (пусть и вошедший) не может выдать ссылку на чужую карту.
+    res = await client.post(f"/polygons/{polygon_id}/share-link", headers=_auth(other_jwt))
+    assert res.status_code == 403
+
+    res = await client.post(f"/polygons/{polygon_id}/share-link", headers=_auth(owner_jwt))
+    assert res.status_code == 200
+    token = res.json()["share_token"]
+    assert token
+
+    # Повторное «поделиться» не выдаёт новый токен — иначе разосланные
+    # раньше ссылки молча перестали бы работать.
+    res = await client.post(f"/polygons/{polygon_id}/share-link", headers=_auth(owner_jwt))
+    assert res.json()["share_token"] == token
+
+    assert (await client.get(f"/polygons/{polygon_id}", params={"share": token})).status_code == 200
+    assert (await client.get(f"/polygons/{polygon_id}", params={"share": "нет"})).status_code == 401
+
+    # Токен одной карты не открывает полигон другой.
+    res = await client.post("/polygons/custom", json={"points": _POINTS}, headers=_auth(other_jwt))
+    foreign_id = res.json()["anon_polygon_id"]
+    assert (await client.get(f"/polygons/{foreign_id}", params={"share": token})).status_code == 401

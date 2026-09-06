@@ -8,7 +8,7 @@
 # override with an env var once the backend's real host/port is known:
 #   BACKEND_UPSTREAM=localhost:8000 caddy run --config infra/caddy/Caddyfile
 
-{$CADDY_ADDR:localhost:2030} {
+{$CADDY_ADDR:http://localhost:2030} {
 	# Backend API — see ../../tasks/backend.md for the routes it must serve
 	# (/polygons, /polygons/custom, /timeseries/{id}, /anomalies).
 	handle /api/* {
@@ -16,9 +16,14 @@
 		reverse_proxy {$BACKEND_UPSTREAM:localhost:8000}
 	}
 
-	# Flutter web build output.
+	# Flutter web build output. Путь — относительно рабочей директории
+	# caddy (см. заголовок файла: запуск из корня репозитория), а не
+	# относительно самого Caddyfile — раньше здесь было "../../frontend/
+	# build/web", что при запуске из корня репозитория уводило на два
+	# уровня ВЫШЕ репозитория и молча резолвилось в несуществующий путь
+	# (caddy тогда отдавал 404 на всё, включая "/").
 	handle {
-		root * ../../frontend/build/web
+		root * frontend/build/web
 		try_files {path} /index.html
 		file_server
 	}

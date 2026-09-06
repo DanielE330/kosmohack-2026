@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_repository.dart';
+import 'demo_accounts.dart';
 
 const _kTokenKey = 'auth_token';
 const _kEmailKey = 'auth_email';
@@ -28,14 +29,18 @@ class MockAuthRepository extends AuthRepository {
   String? _token;
   String? _email;
 
-  /// Готовый демо-аккаунт — чтобы можно было сразу войти на моке, не
+  /// Готовые демо-аккаунты — чтобы можно было сразу войти на моке, не
   /// проходя регистрацию (её всё равно можно пройти отдельно, с любым
-  /// другим email).
-  static const demoEmail = 'demo@skytime.dev';
-  static const demoPassword = 'demo1234';
+  /// другим email). Список общий с реальным бэкендом, см.
+  /// `demo_accounts.dart`.
+  static String get demoEmail => demoAccounts.first.email;
+  static String get demoPassword => demoAccounts.first.password;
 
   MockAuthRepository() {
-    _users[demoEmail] = _MockUser(email: demoEmail, password: demoPassword)..confirmed = true;
+    for (final account in demoAccounts) {
+      _users[account.email] = _MockUser(email: account.email, password: account.password)
+        ..confirmed = true;
+    }
   }
 
   @override

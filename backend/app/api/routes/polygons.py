@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 import httpx
@@ -12,7 +13,7 @@ from app.models.timeseries import NdviObservation
 from app.models.user import User
 from app.schemas.polygon import PolygonCreate, PolygonOut, PolygonUpdate
 from app.schemas.timeseries import NdviPointOut
-from app.services import gee_bridge, maps as maps_service, region_search
+from app.services import gee_bridge, gee_ingest, maps as maps_service, region_search
 
 router = APIRouter(tags=["polygons"])
 
@@ -31,6 +32,26 @@ async def _visible_polygons(db: AsyncSession, current_user: User | None) -> list
     accessible_maps = await maps_service.list_accessible_maps(db, current_user)
     accessible_map_ids = {m.id for m in accessible_maps}
     return [p for p in all_polygons if p.map_id is None or p.map_id in accessible_map_ids]
+
+
+async def _can_view_polygon(
+    db: AsyncSession, polygon: Polygon, current_user: User | None, share_token: str | None
+) -> bool:
+    """Три пути доступа к одному полигону, ровно те же, что и у списка:
+    открытый сидовый полигон датасета (`map_id IS NULL`) — всем; полигон на
+    карте — владельцу/приглашённому; и, кроме них, тому, кто пришёл по
+    ссылке «поделиться» с токеном именно этой карты. Последнее — потому что
+    ссылку почти всегда открывают без входа, а `MapMember` привязан к
+    аккаунту: без этого получатель ссылки видел бы «Полигон не найден»."""
+    if polygon.map_id is None:
+        return True
+    shared_map = await maps_service.get_by_share_token(db, share_token)
+    if shared_map is not None and shared_map.id == polygon.map_id:
+        return True
+    if current_user is None:
+        return False
+    map_ = await db.get(Map, polygon.map_id)
+    return map_ is not None and await maps_service.can_view(db, current_user, map_)
 
 
 async def _require_edit_access(db: AsyncSession, polygon: Polygon, current_user: User) -> None:
@@ -199,7 +220,11 @@ async def get_live_sources(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
     try:
         points = [(p[0], p[1]) for p in polygon.points]
-        return gee_bridge.fetch_live_sources(points, date_from, date_to)
+        # to_thread — иначе синхронные ретраи GEE (time.sleep в
+        # gee_bridge._with_retries) блокируют event loop uvicorn
+        # целиком, и сервис не отвечает даже на /health другим
+        # пользователям, пока идёт один этот запрос.
+        return await asyncio.to_thread(gee_bridge.fetch_live_sources, points, date_from, date_to)
     except gee_bridge.GEEUnavailable as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     except ValueError as exc:
@@ -236,13 +261,101 @@ async def create_custom_polygon(
     db.add(polygon)
     await db.commit()
     await db.refresh(polygon)
+
+    # Сразу тянем реальный ряд из GEE, иначе у только что нарисованного
+    # полигона нет ни одного наблюдения и карточка участка показывает
+    # «Нет данных за выбранный период». `try_*` — потому что контур обязан
+    # сохраниться в любом случае: GEE это внешний сервис (нет кредов,
+    # квота, сеть), и его недоступность не должна ломать создание.
+    # Догрузить данные потом можно через POST /polygons/{id}/refresh-data.
+    await gee_ingest.try_fetch_and_store(db, polygon)
+    await db.refresh(polygon)
     return polygon
 
 
-@router.get("/polygons/{polygon_id}", response_model=PolygonOut, summary="Получить один полигон")
-async def get_polygon(polygon_id: str, db: AsyncSession = Depends(get_db)) -> Polygon:
+@router.post(
+    "/polygons/{polygon_id}/refresh-data",
+    summary="Подтянуть свежие данные из Google Earth Engine и пересчитать аномалии",
+)
+async def refresh_polygon_data(
+    polygon_id: str,
+    date_from: str | None = Query(None, description="YYYY-MM-DD, по умолчанию год назад"),
+    date_to: str | None = Query(None, description="YYYY-MM-DD, по умолчанию сегодня"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """В отличие от `/live-sources` (просто отдаёт сырой ответ GEE), здесь
+    данные СОХРАНЯЮТСЯ в ряд полигона, прогоняются через восстановление
+    пропусков и пересчёт аномалий — то есть после вызова график и статусы
+    на карте показывают реальные спутниковые данные.
+
+    Ошибку GEE отдаём как 503 с текстом причины: фронт показывает её
+    вместо безликого «нет данных», чтобы было видно, что чинить."""
     polygon = await db.get(Polygon, polygon_id)
     if polygon is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
+    await _require_edit_access(db, polygon, current_user)
+    try:
+        stored = await gee_ingest.fetch_and_store(db, polygon, date_from, date_to)
+    except gee_bridge.GEEUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return {"anon_polygon_id": polygon.id, "dates_stored": stored}
+
+
+@router.post(
+    "/polygons/{polygon_id}/share-link",
+    summary="Ссылка «поделиться участком», которая открывается без входа",
+)
+async def create_polygon_share_link(
+    polygon_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """За кнопкой «Поделиться» на карточке участка. Открытые сидовые
+    полигоны публичны и так — им токен не нужен (`share_token: null`, фронт
+    просто копирует адрес страницы). Полигону на карте выдаём токен самой
+    карты: шаринг в проекте живёт на уровне `Map` (см. `MapMember`), и
+    ссылка — тот же доступ, только не привязанный к аккаунту. Выдать её
+    может лишь тот, кто может карту менять (владелец/editor): viewer не
+    должен расширять чужой доступ за владельца."""
+    polygon = await db.get(Polygon, polygon_id)
+    if polygon is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
+    if polygon.map_id is None:
+        return {"share_token": None}
+
+    map_ = await db.get(Map, polygon.map_id)
+    if map_ is None or not await maps_service.can_edit(db, current_user, map_):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Поделиться ссылкой может владелец или редактор карты"
+        )
+    return {"share_token": await maps_service.ensure_share_token(db, map_)}
+
+
+@router.get("/polygons/{polygon_id}", response_model=PolygonOut, summary="Получить один полигон")
+async def get_polygon(
+    polygon_id: str,
+    share: str | None = Query(
+        None, description="Токен ссылки «поделиться» (см. POST /polygons/{polygon_id}/share-link)"
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> Polygon:
+    """Права те же, что и у списка `GET /polygons`, плюс ссылка «поделиться»
+    — раньше этот эндпоинт отдавал любой полигон кому угодно, включая чужие
+    приватные карты."""
+    polygon = await db.get(Polygon, polygon_id)
+    if polygon is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
+    if not await _can_view_polygon(db, polygon, current_user, share):
+        # Анониму — 401, чтобы фронт предложил войти (у приглашённого на
+        # карту участка доступ появится сразу после входа), а вошедшему без
+        # доступа — 404: сам факт существования чужого участка не наш секрет
+        # для раскрытия (так же ведёт себя и `?map_id=`).
+        if current_user is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти, чтобы открыть этот участок")
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Полигон не найден")
     return polygon
 

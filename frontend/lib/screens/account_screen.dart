@@ -116,13 +116,14 @@ class _AccountScreenState extends State<AccountScreen> {
             if (!loggedIn)
               Card(
                 child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: const CircleAvatar(
                     backgroundColor: SkyTimeColors.teal,
                     child: Icon(Icons.person_outline, color: Colors.white),
                   ),
                   title: const Text('Вы не вошли'),
                   subtitle: const Text('Войдите, чтобы сохранять свои полигоны на сервере'),
-                  trailing: TextButton(
+                  trailing: FilledButton(
                     onPressed: () => context.go('/login'),
                     child: const Text('Войти'),
                   ),
@@ -131,6 +132,13 @@ class _AccountScreenState extends State<AccountScreen> {
             // Кто вошёл/выход — теперь в Настройках, здесь только участки
             // (см. запрос пользователя перенести аккаунт из "Участков").
             if (!loggedIn) const SizedBox(height: 16),
+            // Сводка по своим участкам — те же данные, что уже загружены
+            // для списка, просто собранные в одну строку: открывая кабинет,
+            // хочется сразу увидеть «сколько всего и что горит».
+            if (loggedIn && !_loading && _myPolygons.isNotEmpty) ...[
+              _SummaryStrip(polygons: _myPolygons, statuses: _latestStatus),
+              const SizedBox(height: 20),
+            ],
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -160,9 +168,9 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            Text('Мои полигоны', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: 28),
+            Text('Мои полигоны', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.all(24),
@@ -195,6 +203,123 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 }
 
+/// Сводка «сколько участков / сколько гектаров / сколько не в норме».
+/// Считается по уже загруженным данным — дополнительных запросов не
+/// делает.
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip({required this.polygons, required this.statuses});
+
+  final List<NdviPolygon> polygons;
+  final Map<String, NdviStatus> statuses;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalHectares =
+        polygons.fold<double>(0, (sum, p) => sum + polygonAreaHectares(p));
+    final attention = polygons
+        .where((p) => (statuses[p.id] ?? NdviStatus.normal) != NdviStatus.normal)
+        .length;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // На узком экране три плитки в ряд сжимаются до нечитаемого —
+        // там они переносятся в столбик (Wrap с полной шириной).
+        final tileWidth = constraints.maxWidth < 520
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 24) / 3;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(
+              width: tileWidth,
+              child: _SummaryTile(
+                icon: Icons.crop_square_outlined,
+                label: 'Участков',
+                value: '${polygons.length}',
+                accent: SkyTimeColors.teal,
+              ),
+            ),
+            SizedBox(
+              width: tileWidth,
+              child: _SummaryTile(
+                icon: Icons.straighten_outlined,
+                label: 'Общая площадь',
+                value: '${totalHectares.toStringAsFixed(1)} га',
+                accent: SkyTimeColors.lime,
+              ),
+            ),
+            SizedBox(
+              width: tileWidth,
+              child: _SummaryTile(
+                icon: Icons.warning_amber_outlined,
+                label: 'Требуют внимания',
+                value: '$attention',
+                accent: attention > 0 ? statusColor(NdviStatus.suppression) : SkyTimeColors.violet,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(SkyTimeRadii.large),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(SkyTimeRadii.small),
+            ),
+            child: Icon(icon, size: 18, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelMedium),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 20),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Карточка участка по референсу макета (`style/SkyTime Map & Account.dc.html`):
 /// цветная полоска слева, площадь, статус в виде «таблетки». Цвет
 /// полоски — просто визуальный акцент по кругу цветов бренда (не несёт
@@ -222,8 +347,9 @@ class _PolygonCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        hoverColor: SkyTimeColors.teal.withValues(alpha: 0.06),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
               Container(width: 4, height: 32, decoration: BoxDecoration(

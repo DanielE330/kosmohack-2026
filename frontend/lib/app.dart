@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/active_map_controller.dart';
+import 'data/api_exception.dart';
 import 'data/auth_repository.dart';
 import 'data/vegetation_data_service.dart';
 import 'models/ndvi_polygon.dart';
@@ -62,6 +63,9 @@ class KosmohackApp extends StatelessWidget {
           builder: (context, state) => _PolygonRoute(
             service: service,
             id: state.pathParameters['id']!,
+            // Токен из ссылки «поделиться» — по нему участок с чужой карты
+            // открывается и без входа (см. PolygonDetailScreen._share).
+            shareToken: state.uri.queryParameters['share'],
             auth: auth,
           ),
         ),
@@ -129,27 +133,95 @@ class KosmohackApp extends StatelessWidget {
 /// Разрешает полигон только по `id` (без `extra`) — так маршрут остаётся
 /// корректным диплинком и не зависит от того, каким способом на него
 /// перешли (см. комментарий у [routeObserver]).
-class _PolygonRoute extends StatelessWidget {
-  const _PolygonRoute({required this.service, required this.id, required this.auth});
+class _PolygonRoute extends StatefulWidget {
+  const _PolygonRoute({
+    required this.service,
+    required this.id,
+    required this.auth,
+    this.shareToken,
+  });
 
   final VegetationDataService service;
   final String id;
+  final String? shareToken;
   final AuthRepository auth;
 
   @override
+  State<_PolygonRoute> createState() => _PolygonRouteState();
+}
+
+class _PolygonRouteState extends State<_PolygonRoute> {
+  // Запрос заводится один раз, а не в build(): иначе любая перерисовка
+  // (в т.ч. смена темы) заново дёргала бы бэкенд и мигала спиннером.
+  late Future<NdviPolygon> _future = _load();
+
+  Future<NdviPolygon> _load() =>
+      widget.service.getPolygon(widget.id, shareToken: widget.shareToken);
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<NdviPolygon>>(
-      future: service.getPolygons(),
+    return FutureBuilder<NdviPolygon>(
+      future: _future,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        final found = snapshot.data!.where((p) => p.id == id);
-        if (found.isEmpty) {
-          return const Scaffold(body: Center(child: Text('Полигон не найден')));
-        }
-        return PolygonDetailScreen(service: service, polygon: found.first, auth: auth);
+        final error = snapshot.error;
+        if (error != null) return _errorScaffold(context, error);
+        return PolygonDetailScreen(
+          service: widget.service,
+          polygon: snapshot.data!,
+          auth: widget.auth,
+        );
       },
+    );
+  }
+
+  /// Ссылку на участок чаще всего открывают в чужом браузере, где никто не
+  /// вошёл, поэтому «нет доступа» и «нет такого участка» надо разделять:
+  /// 401 значит, что доступ, скорее всего, есть — но у аккаунта, а не у
+  /// анонимной вкладки, и человеку надо предложить войти, а не тупик
+  /// «Полигон не найден».
+  Widget _errorScaffold(BuildContext context, Object error) {
+    final api = error is ApiException ? error : null;
+    final needsLogin = api?.isUnauthorized ?? false;
+    final message = needsLogin
+        ? 'Этот участок лежит на закрытой карте — войдите под аккаунтом, '
+            'которому владелец дал доступ, или попросите у него ссылку заново.'
+        : (api?.isNotFound ?? false)
+            ? 'Полигон не найден'
+            : 'Не удалось открыть участок: ${api?.message ?? error}';
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/map'),
+        ),
+        title: const Text('Участок'),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              if (needsLogin)
+                FilledButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Войти'),
+                )
+              else
+                OutlinedButton(
+                  onPressed: () => setState(() => _future = _load()),
+                  child: const Text('Повторить'),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

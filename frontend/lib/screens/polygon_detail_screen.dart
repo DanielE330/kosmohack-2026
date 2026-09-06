@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import '../data/vegetation_data_service.dart';
 import '../models/anomaly.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
+import '../utils/csv_download.dart';
 import '../utils/ndvi_style.dart';
 import '../widgets/ndvi_chart.dart';
 
@@ -34,6 +36,7 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
   bool _loading = true;
   bool _deleting = false;
   bool _saving = false;
+  bool _exporting = false;
   String? _error;
 
   @override
@@ -140,6 +143,38 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
+  /// Excel-выгрузка по этому участку: книга с листами «Сводка»,
+  /// «Наблюдения» (весь ряд ДЗЗ/ERA5 с русскими заголовками) и «Аномалии».
+  /// Файл собирает бэкенд (`GET /export/polygon/{id}.xlsx`) — на графике
+  /// видно только NDVI, а в таблице нужны все исходные показатели.
+  Future<void> _exportExcel() async {
+    if (!kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Скачивание файлов поддерживается только в веб-версии')),
+      );
+      return;
+    }
+    setState(() => _exporting = true);
+    try {
+      final file = await widget.service.exportExcel([_polygon.id]);
+      if (!mounted) return;
+      if (file == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Excel-выгрузка доступна только с реальным бэкендом')),
+        );
+        return;
+      }
+      downloadBytes(file.filename, file.bytes, file.mimeType);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось выгрузить Excel: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   /// Критерий «Управление полигонами» требует не только добавлять, но и
   /// удалять выбранные участки — см. tasks/backend.md (DELETE /polygons/{id}).
   Future<void> _confirmDelete() async {
@@ -185,16 +220,35 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
     }
   }
 
-  /// Просмотр полигона (`GET /polygons`, `/timeseries`, `/anomalies`)
-  /// публичный и не требует токена — значит прямая ссылка на этот экран
-  /// уже сама по себе и есть «поделиться зоной»: тот, кому её отправили,
-  /// откроет ровно этот же полигон без входа в аккаунт.
+  /// Открытые сидовые контуры датасета видны без входа, и для них адрес
+  /// страницы — уже готовая ссылка. А вот участок на чьей-то карте виден
+  /// только владельцу и приглашённым: голая ссылка на него у получателя
+  /// открывалась как «Полигон не найден». Поэтому здесь спрашиваем у
+  /// бэкенда токен ссылки «поделиться» (`POST /polygons/{id}/share-link`)
+  /// и дописываем его в адрес — по такой ссылке участок открывается и без
+  /// входа, но только потому, что владелец карты явно её создал.
   Future<void> _share() async {
-    final link = Uri.base.toString();
-    await Clipboard.setData(ClipboardData(text: link));
+    var link = Uri.base;
+    var warning = '';
+
+    if (_polygon.mapId != null) {
+      try {
+        final token = await widget.service.createShareLinkToken(_polygon.id);
+        if (token != null) {
+          link = link.replace(queryParameters: {...link.queryParameters, 'share': token});
+        }
+      } catch (_) {
+        // Токен выдают только владельцу/редактору карты. Ссылку всё равно
+        // копируем — она рабочая для тех, кого уже пригласили, — но честно
+        // предупреждаем, что «кому угодно» она не откроется.
+        warning = ' — открыть её смогут только те, кому уже дан доступ к карте';
+      }
+    }
+
+    await Clipboard.setData(ClipboardData(text: link.toString()));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Ссылка на полигон скопирована в буфер обмена')),
+      SnackBar(content: Text('Ссылка на полигон скопирована в буфер обмена$warning')),
     );
   }
 
@@ -209,6 +263,13 @@ class _PolygonDetailScreenState extends State<PolygonDetailScreen> {
         ),
         title: Text(_polygon.label),
         actions: [
+          IconButton(
+            icon: _exporting
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.table_view_outlined),
+            tooltip: 'Скачать Excel по участку',
+            onPressed: (_loading || _exporting) ? null : _exportExcel,
+          ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
             tooltip: 'Поделиться ссылкой на полигон',

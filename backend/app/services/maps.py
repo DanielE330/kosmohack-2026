@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +29,26 @@ async def can_view(db: AsyncSession, user: User, map_: Map) -> bool:
 
 async def can_edit(db: AsyncSession, user: User, map_: Map) -> bool:
     return await get_role(db, user, map_) == MapRole.editor
+
+
+async def get_by_share_token(db: AsyncSession, token: str | None) -> Map | None:
+    """Карта, на которую выдана ссылка «поделиться», или `None`. Пустой
+    токен не ищем: у карт без выданной ссылки `share_token IS NULL`, и
+    запрос по `None` иначе матчил бы «первую попавшуюся» приватную карту."""
+    if not token:
+        return None
+    result = await db.execute(select(Map).where(Map.share_token == token))
+    return result.scalar_one_or_none()
+
+
+async def ensure_share_token(db: AsyncSession, map_: Map) -> str:
+    """Токен один на карту и при повторном «поделиться» не меняется —
+    иначе каждая новая ссылка молча ломала бы все разосланные раньше."""
+    if map_.share_token is None:
+        map_.share_token = secrets.token_urlsafe(24)
+        await db.commit()
+        await db.refresh(map_)
+    return map_.share_token
 
 
 async def list_accessible_maps(db: AsyncSession, user: User) -> list[Map]:

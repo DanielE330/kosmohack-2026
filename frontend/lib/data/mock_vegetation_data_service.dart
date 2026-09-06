@@ -317,6 +317,18 @@ class MockVegetationDataService implements VegetationDataService {
   }
 
   @override
+  Future<NdviPolygon> getPolygon(String polygonId, {String? shareToken}) async {
+    // В демо-режиме все полигоны одной сессии и так видны всем — токен
+    // ссылки проверять не у кого (реальные права живут на бэкенде).
+    final found = _polygons.where((p) => p.id == polygonId);
+    if (found.isEmpty) throw Exception('Полигон $polygonId не найден');
+    return found.first;
+  }
+
+  @override
+  Future<String?> createShareLinkToken(String polygonId) async => null;
+
+  @override
   Future<NdviPolygon> submitCustomPolygon(List<LatLng> points, {String? label, int? mapId}) async {
     _customCounter++;
     final id = 'CUSTOM-$_customCounter';
@@ -533,6 +545,11 @@ class MockVegetationDataService implements VegetationDataService {
     map.members.add((email: email, role: role));
     return MapMemberInfo(userId: email.hashCode, invitedEmail: email, role: role);
   }
+
+  /// Excel собирается на бэкенде — в демо-режиме без него отдаём `null`,
+  /// и экран отчётов честно откатывается на CSV, собранный на клиенте.
+  @override
+  Future<ExportedFile?> exportExcel(List<String> polygonIds) async => null;
 
   @override
   Future<void> removeMapMember(int mapId, int userId) async {

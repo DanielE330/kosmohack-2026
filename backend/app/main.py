@@ -4,8 +4,9 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import anomalies, auth, maps, polygons, timeseries
+from app.api.routes import anomalies, auth, export, maps, polygons, timeseries
 from app.config import settings
+from app.services.demo_seed import seed_demo_users_safe
 
 
 @asynccontextmanager
@@ -13,6 +14,10 @@ async def lifespan(app: FastAPI):
     # Общий клиент для похода в открытые источники (Overpass/Nominatim) —
     # см. app/services/region_search.py, используется в GET /polygons?region=...
     app.state.http_client = httpx.AsyncClient()
+    # Демо-аккаунты (см. app/services/demo_seed.py) — идемпотентно, чтобы
+    # после пересоздания базы в приложение по-прежнему было чем войти.
+    if settings.seed_demo_accounts:
+        await seed_demo_users_safe()
     yield
     await app.state.http_client.aclose()
 
@@ -34,6 +39,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Фронт скачивает готовый .xlsx/.zip через fetch с Authorization и
+    # берёт имя файла из Content-Disposition — без expose этот заголовок
+    # браузером из ответа не отдаётся, и файл сохранялся бы безымянным.
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth.router)
@@ -41,6 +50,7 @@ app.include_router(maps.router)
 app.include_router(polygons.router)
 app.include_router(timeseries.router)
 app.include_router(anomalies.router)
+app.include_router(export.router)
 
 
 @app.get("/health", tags=["service"], summary="Проверка живости сервиса")

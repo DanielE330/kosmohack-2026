@@ -8,6 +8,7 @@ import '../models/demo_area.dart';
 import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
+import 'api_exception.dart';
 import 'vegetation_data_service.dart';
 
 /// Работает с реальным бэкендом, когда он появится. Соответствует
@@ -63,6 +64,28 @@ class HttpVegetationDataService implements VegetationDataService {
     return list
         .map((e) => NdviPolygon.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<NdviPolygon> getPolygon(String polygonId, {String? shareToken}) async {
+    // Именно один полигон по id, а не поиск в списке `GET /polygons`:
+    // список отдаёт только видимое текущему пользователю, поэтому по
+    // присланной ссылке участок с чужой карты в нём не находился и экран
+    // показывал «Полигон не найден». Здесь бэкенд сам решает по правам —
+    // и понимает токен ссылки «поделиться» для тех, кто не вошёл.
+    final res = await _client.get(
+      _uri('/polygons/$polygonId', shareToken != null ? {'share': shareToken} : null),
+      headers: _authHeaders(),
+    );
+    _checkOk(res);
+    return NdviPolygon.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<String?> createShareLinkToken(String polygonId) async {
+    final res = await _client.post(_uri('/polygons/$polygonId/share-link'), headers: _authHeaders());
+    _checkOk(res);
+    return (jsonDecode(res.body) as Map<String, dynamic>)['share_token'] as String?;
   }
 
   @override
@@ -211,9 +234,65 @@ class HttpVegetationDataService implements VegetationDataService {
     return list.map((e) => Anomaly.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  @override
+  Future<ExportedFile?> exportExcel(List<String> polygonIds) async {
+    if (polygonIds.isEmpty) return null;
+    // Один участок — книга .xlsx, несколько — zip с книгой на каждый
+    // (см. backend/app/api/routes/export.py).
+    final single = polygonIds.length == 1;
+    final uri = single
+        ? _uri('/export/polygon/${Uri.encodeComponent(polygonIds.single)}.xlsx')
+        : _uri('/export/polygons.zip', {'ids': polygonIds.join(',')});
+    // Скачиваем обычным GET с заголовком Authorization и отдаём blob, а не
+    // открываем URL в новой вкладке: window.open заголовки не передаёт, а
+    // токен в query-параметре утёк бы в историю браузера и логи прокси.
+    final res = await _client.get(uri, headers: _authHeaders());
+    _checkOk(res);
+    final fallback = single ? 'skytime-${polygonIds.single}.xlsx' : 'skytime-report.zip';
+    return (
+      filename: _filenameFromHeaders(res.headers) ?? fallback,
+      bytes: res.bodyBytes,
+      mimeType: res.headers['content-type'] ??
+          (single
+              ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+              : 'application/zip'),
+    );
+  }
+
+  /// Имя файла из `Content-Disposition`. Оно кириллическое, поэтому
+  /// бэкенд отдаёт его в RFC 5987-форме `filename*=UTF-8''%D0%9E...` —
+  /// её и разбираем в первую очередь, обычный `filename="..."` остаётся
+  /// запасным вариантом.
+  String? _filenameFromHeaders(Map<String, String> headers) {
+    final disposition = headers['content-disposition'];
+    if (disposition == null) return null;
+    final encoded = RegExp(r"filename\*=UTF-8''([^;]+)").firstMatch(disposition);
+    if (encoded != null) {
+      try {
+        return Uri.decodeComponent(encoded.group(1)!.trim());
+      } catch (_) {
+        // Битая процентная кодировка — не повод ронять скачивание.
+      }
+    }
+    final plain = RegExp(r'filename="([^"]+)"').firstMatch(disposition);
+    return plain?.group(1);
+  }
+
   void _checkOk(http.Response res) {
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('API error ${res.statusCode}: ${res.body}');
+      throw ApiException(res.statusCode, _detail(res));
     }
+  }
+
+  /// FastAPI кладёт человекочитаемую причину в `detail` — показываем её,
+  /// а не сырой JSON: тексты ошибок на бэкенде уже написаны для человека.
+  String _detail(http.Response res) {
+    try {
+      final body = jsonDecode(res.body);
+      if (body is Map && body['detail'] is String) return body['detail'] as String;
+    } catch (_) {
+      // Не JSON (например, HTML от прокси) — покажем как есть.
+    }
+    return res.body;
   }
 }

@@ -5,6 +5,7 @@ import '../data/active_map_controller.dart';
 import '../data/status_transition_tracker.dart';
 import '../theme.dart';
 import 'map_switcher.dart';
+import 'skytime_logo.dart';
 
 /// Раздел навигации в левом сайдбаре — по референсу макета из `style/`
 /// (`SkyTime Map & Account.dc.html`).
@@ -95,16 +96,37 @@ class _SidebarState extends State<_Sidebar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: 216,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
+        // Из темы, а не хардкодом в белый: в тёмной теме белый сайдбар
+        // рядом с тёмным контентом выглядел как непрокрашенный блок.
+        color: theme.cardColor,
+        border: Border(right: BorderSide(color: theme.dividerColor)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Логотип — точка возврата на главную, как в шапке остальных
+          // экранов; заодно сайдбар перестаёт начинаться «с воздуха».
+          Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 18),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.go('/'),
+                  child: SkyTimeLogo(
+                    height: 20,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          ),
           if (widget.activeMapController != null) ...[
             MapSwitcher(controller: widget.activeMapController!),
             const SizedBox(height: 16),
@@ -160,11 +182,18 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Невыбранный пункт — приглушённый цвет текста темы (в тёмной теме
+    // navy на тёмном фоне был нечитаем).
+    final idleColor = scheme.onSurface.withValues(alpha: 0.72);
     return Material(
       color: selected ? SkyTimeColors.teal : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
+        // Наведение подсвечивает пункт тем же акцентом, что и выбор, —
+        // видно, что строка кликабельна, ещё до клика.
+        hoverColor: SkyTimeColors.teal.withValues(alpha: selected ? 0.0 : 0.10),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -173,7 +202,7 @@ class _SidebarItem extends StatelessWidget {
               Icon(
                 icon,
                 size: 18,
-                color: selected ? Colors.white : SkyTimeColors.navy.withValues(alpha: 0.72),
+                color: selected ? Colors.white : idleColor,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -182,7 +211,7 @@ class _SidebarItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : SkyTimeColors.navy.withValues(alpha: 0.72),
+                    color: selected ? Colors.white : idleColor,
                   ),
                 ),
               ),
@@ -219,11 +248,13 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: SkyTimeColors.cream,
-        borderRadius: BorderRadius.circular(14),
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(SkyTimeRadii.medium),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -234,11 +265,11 @@ class _InfoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w800, color: SkyTimeColors.navy)),
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w800, color: scheme.onSurface)),
                 Text(subtitle,
                     style: TextStyle(
-                        fontSize: 10.5, color: SkyTimeColors.navy.withValues(alpha: 0.7))),
+                        fontSize: 10.5, color: scheme.onSurface.withValues(alpha: 0.7))),
               ],
             ),
           ),

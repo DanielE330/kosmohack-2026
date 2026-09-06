@@ -23,10 +23,12 @@ class _Row {
 }
 
 /// Табличная сводка по своим участкам — площадь, культура, текущий статус
-/// и последняя зафиксированная аномалия. Выбранные строки (чекбоксы) можно
-/// скачать как CSV — открывается в Excel как есть, поэтому отдельный
-/// .xlsx-писатель не подключался (лишняя зависимость ради того же результата
-/// для пользователя).
+/// и последняя зафиксированная аномалия. Выбранные строки (чекбоксы)
+/// выгружаются настоящей Excel-книгой с бэкенда (`/export/...`): один
+/// участок — `.xlsx`, несколько — `.zip` с книгой на каждый. Плоский CSV из
+/// пяти колонок, который собирался тут раньше, остаётся только запасным
+/// вариантом для демо-режима без бэкенда — по нему нельзя было понять ни
+/// откуда взялся NDVI, ни почему участок помечен аномальным.
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, required this.service, required this.auth, required this.activeMapController});
 
@@ -42,6 +44,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<_Row> _rows = [];
   final Set<String> _selected = {};
   bool _loading = true;
+  bool _exporting = false;
   String? _error;
 
   @override
@@ -112,7 +115,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return value;
   }
 
-  void _exportSelected() {
+  /// Excel собирает бэкенд — там есть весь ряд наблюдений и периоды
+  /// аномалий, а не только пять колонок этой таблицы. Если реализация
+  /// сервиса выгрузку не умеет (демо-режим без бэкенда) — откатываемся на
+  /// прежний CSV, чтобы кнопка не выглядела сломанной.
+  Future<void> _exportSelected() async {
+    if (!kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Скачивание файлов поддерживается только в веб-версии')),
+      );
+      return;
+    }
+    setState(() => _exporting = true);
+    try {
+      final file = await widget.service.exportExcel(_selected.toList());
+      if (!mounted) return;
+      if (file != null) {
+        downloadBytes(file.filename, file.bytes, file.mimeType);
+        return;
+      }
+      _exportCsvFallback();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Excel доступен только с реальным бэкендом — выгружен CSV')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось выгрузить Excel: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  void _exportCsvFallback() {
     final dateFmt = DateFormat('d MMM yyyy', 'ru');
     final selectedRows = _rows.where((r) => _selected.contains(r.polygon.id)).toList();
     final header = ['Участок', 'Культура', 'Площадь (га)', 'Статус', 'Последняя аномалия'];
@@ -129,15 +165,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         anomaly,
       ].map(_csvField).join(','));
     }
-    final csv = lines.join('\r\n');
-
-    if (!kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Скачивание файлов поддерживается только в веб-версии')),
-      );
-      return;
-    }
-    downloadCsv('skytime_report.csv', csv);
+    downloadCsv('skytime_report.csv', lines.join('\r\n'));
   }
 
   @override
@@ -157,9 +185,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: FilledButton.icon(
-                onPressed: _selected.isEmpty ? null : _exportSelected,
-                icon: const Icon(Icons.download_outlined, size: 18),
-                label: Text('Скачать (${_selected.length})'),
+                onPressed: (_selected.isEmpty || _exporting) ? null : _exportSelected,
+                icon: _exporting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.table_view_outlined, size: 18),
+                // Несколько участков бэкенд отдаёт архивом — пишем это прямо
+                // на кнопке, иначе скачанный .zip выглядит неожиданностью.
+                label: Text(
+                  _selected.length > 1
+                      ? 'Скачать Excel (${_selected.length}) — zip'
+                      : 'Скачать Excel (${_selected.length})',
+                ),
               ),
             ),
           ],
