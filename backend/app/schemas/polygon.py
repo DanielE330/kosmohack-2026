@@ -32,7 +32,15 @@ class PolygonUpdate(BaseModel):
 
 
 class PolygonOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # populate_by_name нужен, чтобы модель можно было собрать не только из
+    # ORM-объекта (у которого атрибут называется `id`, как и требует
+    # validation_alias), но и из словаря с ключом-именем поля
+    # `anon_polygon_id` — так `PolygonWithTimeseries` в polygons.py собирает
+    # себя из `PolygonOut.model_validate(p).model_dump()`, а `model_dump()`
+    # по умолчанию отдаёт ключи по именам полей, а не по alias'ам. Без этого
+    # `GET /polygons/with-timeseries` падал с 500 (`id: Field required`),
+    # и экран `/map` вообще не мог загрузить карту.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     anon_polygon_id: str = Field(
         ..., validation_alias="id", description="Идентификатор полигона", examples=["AOI-0002"]
