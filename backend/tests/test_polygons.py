@@ -95,9 +95,7 @@ async def test_region_returns_existing_polygon_without_calling_overpass(client, 
 
     monkeypatch.setattr(region_search, "fetch_osm_farmland", _fail_if_called)
 
-    res = await client.get(
-        "/polygons", params={"region": "46.9,38.9,47.2,39.2"}, headers={"Authorization": f"Bearer {jwt}"}
-    )
+    res = await client.get("/polygons", params={"region": "46.9,38.9,47.2,39.2"})
     assert res.status_code == 200
     ids = [p["anon_polygon_id"] for p in res.json()]
     assert len(ids) == 1

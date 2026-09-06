@@ -73,7 +73,13 @@ flutter:
   uses-material-design: true
 
   assets:
+    # Используется widgets/skytime_logo.dart (шапка карты/личного кабинета
+    # и т.п.) — при слиянии с редизайном лендинга эта строка выпала, хотя
+    # сам файл никуда не делся.
     - assets/logo/skytime_wordmark.png
+    - assets/branding/skytime_logo_inverted.png
+    - assets/branding/die-meteor.png
+    - assets/branding/meteor.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

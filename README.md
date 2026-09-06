@@ -27,25 +27,24 @@
 └── tasks/      # бэклог по областям — что сделано и что осталось
 ```
 
-## Как это работает
+## Запуск
 
-1. Пользователь выбирает регион на карте (или указывает bbox/название) —
-   сервис автоматически находит открытые сельхозконтуры (OSM Overpass) или
-   пользователь рисует свой полигон вручную.
-2. Backend строит временной ряд `primary_ndvi` по полигону и восстанавливает
-   пропуски обученной ML-моделью (`ml/`, градиентный бустинг поверх
-   интерполяционного baseline).
-3. Аномалии детектируются по Z-score (`Z≥−1` — штатно, `−2≤Z<−1` —
-   угнетение биомассы, `Z<−2` — критическая аномалия) и получают текстовое
-   объяснение вероятной причины (ML-классификация: засуха, тепловой/
-   холодовой стресс, уборка урожая и т.д.).
-4. Личный кабинет — свои полигоны, аналитика по всему набору, лента
-   уведомлений об аномалиях, табличный отчёт, настройки (тема, смена
-   почты/пароля).
+Бэкенд (FastAPI + PostgreSQL, через Docker Compose):
 
-## Запуск целиком (frontend + backend + ML)
+```bash
+cd backend
+cp .env.example .env
+docker compose up --build -d
+docker compose exec backend alembic upgrade head
+docker compose exec backend python -m app.ingestion.load_train_dataset --csv /data/train_dataset.csv
+# API: http://localhost:8000, Swagger: http://localhost:8000/docs
+```
 
-Нужны Docker и Docker Compose, Flutter SDK 3.x и Python 3.11+.
+Подробнее (переменные окружения, локальный запуск без Docker, тесты,
+batch-инференс) — [`backend/README.md`](backend/README.md).
+
+Фронтенд можно запускать на моковых данных (без бэкенда) или подключить
+к поднятому бэкенду через `--dart-define=API_BASE_URL`:
 
 ```bash
 # 1. Backend (API + PostgreSQL), поднимается в Docker
@@ -64,21 +63,8 @@ python3 -m http.server 2030 --directory build/web --bind 0.0.0.0
 # Открыть http://localhost:2030
 ```
 
-Без `--dart-define=API_BASE_URL=...` фронтенд запускается полностью на
-встроенных моковых данных (без backend) — годится для быстрого просмотра
-UI, но не сохраняет полигоны на сервере. Подробнее —
-[`frontend/README.md`](frontend/README.md) и [`backend/README.md`](backend/README.md).
-
-ML-пайплайн (обучение модели, метрики, batch-инференс для отдельной
-проверки) — [`ml/README.md`](ml/README.md).
-
-## Тесты
-
-```bash
-cd backend && docker compose up -d db && docker compose run --rm backend pytest && docker compose down
-cd frontend && flutter test
-cd ml && python -m unittest discover -s tests -v
-```
+Подробнее — [`frontend/README.md`](frontend/README.md). Фронт+бэк одним
+портом через Caddy — [`infra/README.md`](infra/README.md).
 
 ## С чего начать
 
@@ -86,4 +72,3 @@ cd ml && python -m unittest discover -s tests -v
   API, реальная схема данных, формат `submission.csv`, метрика).
 - Статус ML-решения — [`tasks/ml.md`](tasks/ml.md).
 - Что осталось во фронтенде — [`tasks/frontend.md`](tasks/frontend.md).
-- Локальный прокси фронт+бэк одним портом — [`infra/README.md`](infra/README.md).

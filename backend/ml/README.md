@@ -143,12 +143,38 @@ uvicorn webapp.main:app --reload
 - регулярная временная сетка и восстановление моделью дат без чистого снимка;
 - приблизительные контуры сельхозугодий из ESA WorldCover.
 
-### Авторизация Earth Engine
+### Источник спутниковых данных
+
+`webapp/main.py` выбирает бэкенд через `VEGMON_DATA_SOURCE` (по умолчанию
+`copernicus`):
+
+- **`copernicus`** (по умолчанию) — Sentinel-2 NDVI/EVI/NDWI через Sentinel
+  Hub Statistical API на Copernicus Data Space + погода через бесплатный
+  Open-Meteo (без ключа). Не требует привязки карты/биллинга. Нет
+  Landsat/MODIS/WorldCover — `/find-polygons` в этом режиме недоступен
+  (501).
+- **`gee`** — полный набор источников (Sentinel-2/Landsat/MODIS/ERA5-Land/
+  WorldCover) через Google Earth Engine, но требует зарегистрированный и
+  привязанный к биллингу Cloud-проект.
+
+#### Copernicus Data Space (по умолчанию, бесплатно)
+
+```bash
+python -m pip install -r requirements.txt
+# Создать OAuth-клиент: dataspace.copernicus.eu -> Account settings -> OAuth clients
+export CDSE_CLIENT_ID="..."
+export CDSE_CLIENT_SECRET="..."
+
+uvicorn webapp.main:app --reload
+```
+
+#### Google Earth Engine (опционально, нужен биллинг)
 
 ```bash
 python -m pip install -r requirements.txt
 earthengine authenticate
 export EARTHENGINE_PROJECT="your-google-cloud-project-id"
+export VEGMON_DATA_SOURCE=gee
 
 # Короткий реальный запрос к четырём источникам
 python scripts/check_gee.py --project "$EARTHENGINE_PROJECT"
