@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_current_user_optional, get_db, get_http_client
 from app.models.map import Map
 from app.models.polygon import Polygon
+from app.models.timeseries import NdviObservation
 from app.models.user import User
 from app.schemas.polygon import PolygonCreate, PolygonOut, PolygonUpdate
+from app.schemas.timeseries import NdviPointOut
 from app.services import gee_bridge, maps as maps_service, region_search
 
 router = APIRouter(tags=["polygons"])
@@ -117,6 +119,63 @@ async def list_polygons(
     for polygon in new_polygons:
         await db.refresh(polygon)
     return new_polygons
+
+
+class PolygonWithTimeseries(PolygonOut):
+    timeseries: list[NdviPointOut] = []
+
+
+@router.get(
+    "/polygons/with-timeseries",
+    response_model=list[PolygonWithTimeseries],
+    summary="Полигоны карты вместе с их временными рядами — один запрос вместо N+1",
+)
+async def list_polygons_with_timeseries(
+    map_id: int | None = Query(
+        None, description="Только полигоны конкретной карты (нужен доступ к ней)"
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> list[PolygonWithTimeseries]:
+    """Экран карты грузит список полигонов, а затем — для каждого из них
+    отдельным HTTP-запросом полный временной ряд (нужен весь ряд сразу,
+    т.к. по нему листает общий для карты ползунок дат). На реальном бэкенде
+    с десятками полигонов это N+1 отдельных round-trip'ов даже при их
+    параллельном запуске с фронтенда — задержка растёт с числом полигонов.
+    Здесь то же самое отдаётся одним запросом: список полигонов — тем же
+    кодом доступа, что и `GET /polygons`, а наблюдения — одним `IN (...)`
+    запросом вместо отдельного `SELECT` на полигон."""
+    if map_id is not None:
+        if current_user is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти, чтобы смотреть эту карту")
+        map_ = await db.get(Map, map_id)
+        if map_ is None or not await maps_service.can_view(db, current_user, map_):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Карта не найдена")
+        result = await db.execute(select(Polygon).where(Polygon.map_id == map_id).order_by(Polygon.id))
+        polygons = list(result.scalars().all())
+    else:
+        polygons = await _visible_polygons(db, current_user)
+
+    if not polygons:
+        return []
+
+    polygon_ids = [p.id for p in polygons]
+    obs_result = await db.execute(
+        select(NdviObservation)
+        .where(NdviObservation.polygon_id.in_(polygon_ids))
+        .order_by(NdviObservation.date)
+    )
+    by_polygon: dict[str, list[NdviObservation]] = {}
+    for obs in obs_result.scalars().all():
+        by_polygon.setdefault(obs.polygon_id, []).append(obs)
+
+    return [
+        PolygonWithTimeseries(
+            **PolygonOut.model_validate(p).model_dump(),
+            timeseries=[NdviPointOut.model_validate(o) for o in by_polygon.get(p.id, [])],
+        )
+        for p in polygons
+    ]
 
 
 @router.get(

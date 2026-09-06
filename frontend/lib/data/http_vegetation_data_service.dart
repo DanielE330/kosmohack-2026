@@ -179,6 +179,29 @@ class HttpVegetationDataService implements VegetationDataService {
   }
 
   @override
+  Future<PolygonsWithTimeseries> getPolygonsWithTimeseries({int? mapId}) async {
+    // Один запрос вместо getPolygons + Future.wait(getTimeseries) на каждый —
+    // см. backend GET /polygons/with-timeseries.
+    final res = await _client.get(
+      _uri('/polygons/with-timeseries', mapId != null ? {'map_id': '$mapId'} : null),
+      headers: _authHeaders(),
+    );
+    _checkOk(res);
+    final list = jsonDecode(res.body) as List;
+    final polygons = <NdviPolygon>[];
+    final timeseries = <String, List<NdviPoint>>{};
+    for (final item in list) {
+      final json = item as Map<String, dynamic>;
+      final polygon = NdviPolygon.fromJson(json);
+      polygons.add(polygon);
+      timeseries[polygon.id] = (json['timeseries'] as List)
+          .map((e) => NdviPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return (polygons: polygons, timeseries: timeseries);
+  }
+
+  @override
   Future<List<Anomaly>> getAnomalies({String? polygonId}) async {
     final res = await _client.get(
       _uri('/anomalies', polygonId != null ? {'polygon_id': polygonId} : null),

@@ -471,6 +471,20 @@ class MockVegetationDataService implements VegetationDataService {
       _timeseries[polygonId] ?? [];
 
   @override
+  Future<PolygonsWithTimeseries> getPolygonsWithTimeseries({int? mapId}) async {
+    // В памяти, без реальной сетевой задержки — просто переиспользуем
+    // уже существующие методы, как раньше делал map_screen.
+    final polygons = await getPolygons(mapId: mapId);
+    final allSeries = await Future.wait(polygons.map((p) => getTimeseries(p.id)));
+    return (
+      polygons: polygons,
+      timeseries: {
+        for (var i = 0; i < polygons.length; i++) polygons[i].id: allSeries[i],
+      },
+    );
+  }
+
+  @override
   Future<List<Anomaly>> getAnomalies({String? polygonId}) async {
     if (polygonId != null) return _anomalies[polygonId] ?? [];
     return _anomalies.values.expand((a) => a).toList();

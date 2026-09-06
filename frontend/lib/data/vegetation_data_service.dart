@@ -6,6 +6,12 @@ import '../models/map_info.dart';
 import '../models/ndvi_point.dart';
 import '../models/ndvi_polygon.dart';
 
+/// См. [VegetationDataService.getPolygonsWithTimeseries].
+typedef PolygonsWithTimeseries = ({
+  List<NdviPolygon> polygons,
+  Map<String, List<NdviPoint>> timeseries,
+});
+
 /// Контракт, соответствующий реальной схеме данных соревнования (по ТЗ):
 ///   GET    /polygons?region={bbox}           -> открытые контуры AOI (OSM/ESA WorldCereal);
 ///                                                с `region` — автопоиск контуров в указанной области
@@ -36,6 +42,15 @@ abstract class VegetationDataService {
   /// [mapId] — только полигоны этой карты (нужен доступ); без него — все,
   /// что видно текущему пользователю (открытые + свои/расшаренные карты).
   Future<List<NdviPolygon>> getPolygons({int? mapId});
+
+  /// То же, что [getPolygons] плюс [getTimeseries] на каждый из них, одним
+  /// вызовом. Экрану карты нужен весь ряд каждого полигона сразу (общий для
+  /// карты ползунок дат), а на реальном бэкенде с десятками полигонов
+  /// N параллельных HTTP-запросов всё равно заметно медленнее одного —
+  /// [HttpVegetationDataService] переопределяет это одним запросом
+  /// (`GET /polygons/with-timeseries`); [MockVegetationDataService] — тем
+  /// же способом, что и раньше (в памяти, без реальной задержки).
+  Future<PolygonsWithTimeseries> getPolygonsWithTimeseries({int? mapId});
 
   /// [mapId] — на какую карту добавить; без него — личная карта
   /// пользователя (создаётся автоматически при первом обращении).

@@ -70,7 +70,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (widget.auth is MockAuthRepository) ...[
+                  // Демо-аккаунт показываем всегда, не только на моке: на
+                  // реальном бэкенде это настоящий заведённый пользователь с
+                  // теми же учётными данными (см. tasks/backend.md — создать
+                  // через POST /auth/register + /auth/confirm-email).
+                  ...[
                     Card(
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       child: Padding(
