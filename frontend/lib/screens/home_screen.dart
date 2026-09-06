@@ -12,11 +12,12 @@ import '../utils/ndvi_style.dart';
 import '../widgets/skytime_logo.dart';
 import '../widgets/time_slider.dart';
 
-/// Корень приложения: краткое приветствие, маленькое интерактивное окошко-
-/// превью карты (те же демо-данные, что и на /map) и пояснение того, что
-/// есть что. Полноразмерная карта — на /map: так демо видно сразу на
-/// экране, без лишних кликов, но остаётся место для текста-объяснения,
-/// которого раньше не было (только модальное окно «О проекте»).
+/// Корень приложения. Тёмный hero-блок по референсу дизайна (`style/`,
+/// ref1.jpg): крупный заголовок «Время видеть больше», спутниковый снимок,
+/// который при наведении (или тапе на тач-устройствах) раскрывается в
+/// NDVI-анализ SkyTime — тот же реальный демо-полигон, что и на /map, а не
+/// статичная картинка. Ниже — светлый блок с пояснением того, что есть что
+/// (без изменений по содержанию, только вход в него теперь другой).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.service, required this.auth});
 
@@ -76,45 +77,27 @@ class _HomeScreenState extends State<HomeScreen> {
   NdviPoint? _pointAt(String polygonId, DateTime date) =>
       nearestPointAt(_timeseries[polygonId], date);
 
+  NdviStatus _statusAt(String id) {
+    final date = _dates.isEmpty ? DateTime.now() : _dates[_dateIndex];
+    return _pointAt(id, date)?.status ?? NdviStatus.normal;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: SkyTimeLogo(height: 20, color: Theme.of(context).colorScheme.onPrimary),
-        actions: [
-          IconButton(
-            icon: Icon(
-              widget.auth.isLoggedIn ? Icons.account_circle : Icons.account_circle_outlined,
-            ),
-            tooltip: widget.auth.isLoggedIn ? 'Личный кабинет (${widget.auth.email})' : 'Личный кабинет',
-            onPressed: () => context.go('/account'),
-          ),
-        ],
-      ),
+      backgroundColor: SkyTimeColors.cream,
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: EdgeInsets.zero,
         children: [
-          _Hero(onOpenMap: () => context.go('/map')),
-          const SizedBox(height: 28),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _MapPreview(
-              // На превью — все полигоны: демо-контуры (не свои, только
-              // для витрины) плюс всё, что уже нарисовал сам пользователь.
-              // В отличие от /map, здесь это просто витрина возможностей,
-              // а не рабочий инструмент, так что пустое превью до первого
-              // входа никого не радует.
-              polygons: _polygons,
-              statusAt: (id) {
-                final date = _dates.isEmpty ? DateTime.now() : _dates[_dateIndex];
-                return _pointAt(id, date)?.status ?? NdviStatus.normal;
-              },
-              dates: _dates,
-              dateIndex: _dateIndex,
-              onDateChanged: (i) => setState(() => _dateIndex = i),
-              loading: _loading,
-              onOpenPolygon: (id) => context.go('/polygon/$id'),
-            ),
+          _HeroSection(
+            auth: widget.auth,
+            polygons: _polygons,
+            statusAt: _statusAt,
+            dates: _dates,
+            dateIndex: _dateIndex,
+            onDateChanged: (i) => setState(() => _dateIndex = i),
+            loading: _loading,
+            onOpenPolygon: (id) => context.go('/polygon/$id'),
           ),
           const SizedBox(height: 36),
           const _Description(),
@@ -125,67 +108,174 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _Hero extends StatelessWidget {
-  const _Hero({required this.onOpenMap});
+/// Тёмная навигационная и hero-секция — на всю ширину экрана, в отличие от
+/// остального контента ниже (тот же приём, что на референсе: тёмная
+/// «шапка» перетекает в светлый контент).
+class _HeroSection extends StatelessWidget {
+  const _HeroSection({
+    required this.auth,
+    required this.polygons,
+    required this.statusAt,
+    required this.dates,
+    required this.dateIndex,
+    required this.onDateChanged,
+    required this.loading,
+    required this.onOpenPolygon,
+  });
 
-  final VoidCallback onOpenMap;
+  final AuthRepository auth;
+  final List<NdviPolygon> polygons;
+  final NdviStatus Function(String id) statusAt;
+  final List<DateTime> dates;
+  final int dateIndex;
+  final ValueChanged<int> onDateChanged;
+  final bool loading;
+  final void Function(String id) onOpenPolygon;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    return Container(
+      width: double.infinity,
+      color: SkyTimeColors.navy,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ShaderMask(
-            shaderCallback: (rect) => const LinearGradient(
-              colors: [SkyTimeColors.teal, SkyTimeColors.lime],
-            ).createShader(rect),
-            child: const Text(
-              'Время видеть больше',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
+          _TopBar(auth: auth),
+          const SizedBox(height: 32),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth > 900;
+              final text = _HeroText(onOpenMap: () => context.go('/map'));
+              final visual = _HoverRevealPreview(
+                polygons: polygons,
+                statusAt: statusAt,
+                dates: dates,
+                dateIndex: dateIndex,
+                onDateChanged: onDateChanged,
+                loading: loading,
+                onOpenPolygon: onOpenPolygon,
+              );
+              if (wide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 5, child: text),
+                    const SizedBox(width: 40),
+                    Expanded(flex: 6, child: visual),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [text, const SizedBox(height: 32), visual],
+              );
+            },
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Мониторинг вегетационной динамики сельхозполей по спутниковым '
-            'данным NDVI: восстановление пропусков и детекция аномалий '
-            'растительного покрова.',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
-                onPressed: onOpenMap,
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('Открыть карту'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => GoRouter.of(context).go('/account'),
-                icon: const Icon(Icons.person_outline),
-                label: const Text('Личный кабинет'),
-              ),
-            ],
-          ),
+          const SizedBox(height: 36),
+          const _StatStrip(),
         ],
       ),
     );
   }
 }
 
-/// Маленькое интерактивное окошко-превью: та же карта, те же демо-данные,
-/// что и на /map, но в ограниченной по высоте рамке — чтобы сразу на входе
-/// было видно, как это выглядит и работает, без перехода на отдельный экран.
-class _MapPreview extends StatelessWidget {
-  const _MapPreview({
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.auth});
+
+  final AuthRepository auth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SkyTimeLogo(height: 22, color: SkyTimeColors.cream),
+        const Spacer(),
+        IconButton(
+          icon: Icon(
+            auth.isLoggedIn ? Icons.account_circle : Icons.account_circle_outlined,
+            color: SkyTimeColors.cream,
+          ),
+          tooltip: auth.isLoggedIn ? 'Личный кабинет (${auth.email})' : 'Личный кабинет',
+          onPressed: () => context.go('/account'),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroText extends StatelessWidget {
+  const _HeroText({required this.onOpenMap});
+
+  final VoidCallback onOpenMap;
+
+  static const _headline = TextStyle(
+    color: Colors.white,
+    fontSize: 44,
+    fontWeight: FontWeight.w800,
+    height: 1.04,
+    letterSpacing: -1,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('ВРЕМЯ', style: _headline),
+        const Text('ВИДЕТЬ', style: _headline),
+        ShaderMask(
+          shaderCallback: (rect) => const LinearGradient(
+            colors: [SkyTimeColors.teal, SkyTimeColors.lime],
+          ).createShader(rect),
+          child: const Text('БОЛЬШЕ.', style: _headline),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Спутниковые данные помогают увидеть изменения на Земле и принимать '
+          'решения вовремя — восстановление пропусков NDVI и детекция аномалий '
+          'растительного покрова.',
+          style: TextStyle(color: SkyTimeColors.cream.withValues(alpha: 0.78), fontSize: 15, height: 1.55),
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: SkyTimeColors.cream,
+                foregroundColor: SkyTimeColors.navy,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              ),
+              onPressed: onOpenMap,
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Начать наблюдение'),
+            ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SkyTimeColors.cream,
+                side: BorderSide(color: SkyTimeColors.cream.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              ),
+              onPressed: () => GoRouter.of(context).go('/account'),
+              icon: const Icon(Icons.person_outline),
+              label: const Text('Личный кабинет'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Спутниковый снимок, который при наведении курсора (или тапе — на
+/// тач-устройствах наведения не бывает) раскрывается в NDVI-анализ:
+/// та же самая карта и те же демо-данные, что на /map, просто в свёрнутом/
+/// развёрнутом виде — не отдельная статичная картинка, а честная
+/// демонстрация того, что действительно умеет сервис.
+class _HoverRevealPreview extends StatefulWidget {
+  const _HoverRevealPreview({
     required this.polygons,
     required this.statusAt,
     required this.dates,
@@ -204,35 +294,44 @@ class _MapPreview extends StatelessWidget {
   final void Function(String id) onOpenPolygon;
 
   @override
+  State<_HoverRevealPreview> createState() => _HoverRevealPreviewState();
+}
+
+class _HoverRevealPreviewState extends State<_HoverRevealPreview> {
+  bool _revealed = false;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor)),
-            child: loading
-                ? const SizedBox(height: 340, child: Center(child: CircularProgressIndicator()))
-                : Column(
-                    children: [
-                      SizedBox(
-                        height: 300,
+        MouseRegion(
+          onEnter: (_) => setState(() => _revealed = true),
+          onExit: (_) => setState(() => _revealed = false),
+          child: GestureDetector(
+            // Тач-устройства не шлют onEnter/onExit — тап переключает вручную.
+            onTap: () => setState(() => _revealed = !_revealed),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: SkyTimeColors.cream.withValues(alpha: 0.15)),
+                ),
+                child: widget.loading
+                    ? const SizedBox(height: 340, child: Center(child: CircularProgressIndicator()))
+                    : SizedBox(
+                        height: 340,
                         child: Stack(
                           children: [
                             FlutterMap(
                               options: const MapOptions(
                                 // Центр — зона реального датасета (южная
-                                // степная Россия, ~47°с.ш. ~40°в.д.), а не
-                                // весь мир: в маленьком окне так сразу видно
-                                // демо-полигоны.
+                                // степная Россия, ~46°с.ш. ~40°в.д.).
                                 initialCenter: ll.LatLng(46.2, 40.2),
                                 initialZoom: 6.2,
                                 minZoom: 3,
                                 maxZoom: 14,
                                 interactionOptions: InteractionOptions(
-                                  // Плюс scrollWheelZoom — раньше превью не масштабировалось
-                                  // колесом мыши на десктопе, только пальцем на тач-устройствах.
                                   flags: InteractiveFlag.pinchZoom |
                                       InteractiveFlag.drag |
                                       InteractiveFlag.scrollWheelZoom |
@@ -246,51 +345,104 @@ class _MapPreview extends StatelessWidget {
                                   userAgentPackageName: 'com.kosmohack.kosmohack_app',
                                   maxNativeZoom: 19,
                                 ),
-                                PolygonLayer(
-                                  polygons: [
-                                    for (final p in polygons)
-                                      Polygon(
-                                        points: p.points,
-                                        color: statusColor(statusAt(p.id)).withValues(alpha: 0.25),
-                                        borderColor: statusColor(statusAt(p.id)),
-                                        borderStrokeWidth: 2,
-                                      ),
-                                  ],
-                                ),
-                                MarkerLayer(
-                                  markers: [
-                                    for (final p in polygons)
-                                      Marker(
-                                        point: p.centroid,
-                                        width: 36,
-                                        height: 36,
-                                        child: _PreviewPin(
-                                          status: statusAt(p.id),
-                                          onTap: () => onOpenPolygon(p.id),
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 260),
+                                  opacity: _revealed ? 1 : 0,
+                                  child: PolygonLayer(
+                                    polygons: [
+                                      for (final p in widget.polygons)
+                                        Polygon(
+                                          points: p.points,
+                                          color: statusColor(widget.statusAt(p.id)).withValues(alpha: 0.45),
+                                          borderColor: statusColor(widget.statusAt(p.id)),
+                                          borderStrokeWidth: 2.5,
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
+                                ),
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 260),
+                                  opacity: _revealed ? 1 : 0,
+                                  child: MarkerLayer(
+                                    markers: [
+                                      for (final p in widget.polygons)
+                                        Marker(
+                                          point: p.centroid,
+                                          width: 36,
+                                          height: 36,
+                                          child: _PreviewPin(
+                                            status: widget.statusAt(p.id),
+                                            onTap: () => widget.onOpenPolygon(p.id),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ],
+                            ),
+                            Positioned(
+                              left: 12,
+                              top: 12,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _revealed ? 0 : 1,
+                                child: const _Badge(text: 'СПУТНИК'),
+                              ),
+                            ),
+                            Positioned(
+                              left: 12,
+                              top: 12,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _revealed ? 1 : 0,
+                                child: const _Badge(text: 'АНАЛИЗ SKYTIME', color: SkyTimeColors.teal),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      // Та же временная шкала, что и на полной карте — по
-                      // датам видно, как менялся статус полей, прямо в
-                      // превью, без перехода на /map.
-                      TimeSlider(dates: dates, index: dateIndex, onChanged: onDateChanged),
-                    ],
-                  ),
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
-          'Превью на демо-данных — двигайте карту, листайте месяцы ползунком '
-          'или нажимайте на метки, чтобы открыть карточку поля.',
-          style: Theme.of(context).textTheme.bodySmall,
+          widget.loading
+              ? 'Загрузка демо-данных…'
+              : 'Наведите курсор на снимок (на телефоне — коснитесь), чтобы увидеть '
+                  'анализ SkyTime: тот же участок, размеченный по состоянию посевов.',
+          style: TextStyle(color: SkyTimeColors.cream.withValues(alpha: 0.65), fontSize: 13),
         ),
+        if (!widget.loading && widget.dates.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: TimeSlider(dates: widget.dates, index: widget.dateIndex, onChanged: widget.onDateChanged),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.text, this.color = SkyTimeColors.navy});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+      ),
     );
   }
 }
@@ -311,6 +463,64 @@ class _PreviewPin extends StatelessWidget {
         color: statusColor(status),
         size: 28,
         shadows: const [Shadow(blurRadius: 4, color: Colors.black45)],
+      ),
+    );
+  }
+}
+
+/// Нижняя плашка hero-секции — по референсу (Sentinel-2 / обновление /
+/// облачная обработка / защита данных), только с реальными фактами проекта.
+class _StatStrip extends StatelessWidget {
+  const _StatStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 28,
+      runSpacing: 18,
+      children: const [
+        _StatItem(icon: Icons.satellite_alt_outlined, title: 'SENTINEL-2', subtitle: '10 м / пиксель'),
+        _StatItem(icon: Icons.update, title: 'КАЖДЫЕ 1–3 ДНЯ', subtitle: 'обновление данных'),
+        _StatItem(icon: Icons.cloud_outlined, title: 'ВОССТАНОВЛЕНИЕ ПРОПУСКОВ', subtitle: 'модель поверх спутника'),
+        _StatItem(icon: Icons.shield_outlined, title: 'ВАШИ ДАННЫЕ', subtitle: 'видны только вам'),
+      ],
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  const _StatItem({required this.icon, required this.title, required this.subtitle});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 200,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: SkyTimeColors.lime, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: SkyTimeColors.cream.withValues(alpha: 0.6), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
