@@ -17,17 +17,17 @@ import '../widgets/time_slider.dart';
 /// есть что. Полноразмерная карта — на /map: так демо видно сразу на
 /// экране, без лишних кликов, но остаётся место для текста-объяснения,
 /// которого раньше не было (только модальное окно «О проекте»).
-class LandingScreen extends StatefulWidget {
-  const LandingScreen({super.key, required this.service, required this.auth});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, required this.service, required this.auth});
 
   final VegetationDataService service;
   final AuthRepository auth;
 
   @override
-  State<LandingScreen> createState() => _LandingScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _LandingScreenState extends State<LandingScreen> {
+class _HomeScreenState extends State<HomeScreen> {
   List<NdviPolygon> _polygons = [];
   final Map<String, List<NdviPoint>> _timeseries = {};
   List<DateTime> _dates = [];

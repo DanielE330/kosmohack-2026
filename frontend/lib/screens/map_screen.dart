@@ -105,14 +105,16 @@ class _MapScreenState extends State<MapScreen> with RouteAware {
       _error = null;
     });
     try {
-      final polygons = await widget.service.getPolygons(mapId: widget.activeMapController.active?.id);
-      // Параллельно, а не по одному — на реальном бэкенде с десятками
-      // полигонов последовательные await-запросы давали заметную задержку
-      // загрузки карты (каждый timeseries — отдельный HTTP-запрос).
-      final allSeries = await Future.wait(polygons.map((p) => widget.service.getTimeseries(p.id)));
-      for (var i = 0; i < polygons.length; i++) {
-        _timeseries[polygons[i].id] = allSeries[i];
-      }
+      // Один запрос вместо getPolygons + N параллельных getTimeseries — на
+      // реальном бэкенде с десятками полигонов это было заметно медленнее
+      // одного batched-запроса даже при параллельном запуске N запросов.
+      final loaded = await widget.service.getPolygonsWithTimeseries(
+        mapId: widget.activeMapController.active?.id,
+      );
+      final polygons = loaded.polygons;
+      _timeseries
+        ..clear()
+        ..addAll(loaded.timeseries);
       final dates = _timeseries.values.expand((l) => l.map((p) => p.date)).toSet().toList()
         ..sort();
       setState(() {

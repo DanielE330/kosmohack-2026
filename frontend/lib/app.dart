@@ -9,7 +9,7 @@ import 'route_observer.dart';
 import 'screens/account_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/confirm_email_screen.dart';
-import 'screens/landing_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/notifications_screen.dart';
@@ -41,12 +41,12 @@ class KosmohackApp extends StatelessWidget {
       routes: [
         GoRoute(
           path: '/',
-          // Корень — лендинг: краткое приветствие, маленькое интерактивное
-          // окошко-превью карты (те же демо-данные) и описание того, что
-          // есть что. Полноразмерная карта живёт на /map — так демо всё
-          // равно видно сразу, без лишних кликов, но есть место и для
-          // пояснительного текста.
-          builder: (context, state) => LandingScreen(service: service, auth: auth),
+          // Корень — главный экран: краткое приветствие, маленькое
+          // интерактивное окошко-превью карты (те же демо-данные) и
+          // описание того, что есть что. Полноразмерная карта живёт на
+          // /map — так демо всё равно видно сразу, без лишних кликов, но
+          // есть место и для пояснительного текста.
+          builder: (context, state) => HomeScreen(service: service, auth: auth),
         ),
         GoRoute(
           path: '/map',
