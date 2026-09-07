@@ -1,0 +1,328 @@
+{
+  "protocol": "same ExtraTrees and folds; formula group ablation",
+  "trees_per_fit": 180,
+  "results": [
+    {
+      "groups": [
+        "none"
+      ],
+      "features": 216,
+      "formula_features": 0,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.75,
+        "blend": 1.0,
+        "pseudo_rmse": 0.0667971435737414,
+        "validation_rmse": 0.06649667358291335,
+        "mean_rmse": 0.06664690857832738
+      },
+      "pseudo_fold_improvements": [
+        0.00038019828860937077,
+        0.0008991569759707746,
+        0.0010884120080830312,
+        0.0009961689148714065
+      ],
+      "validation_fold_improvements": [
+        -0.0004411754829843906,
+        0.00164765326346622,
+        0.0014557903004455003,
+        0.0008061215207844225,
+        0.0013672220749034736
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "harmonic_gap"
+      ],
+      "features": 235,
+      "formula_features": 19,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.75,
+        "blend": 0.9500000000000001,
+        "pseudo_rmse": 0.06683579334208374,
+        "validation_rmse": 0.06661203651340201,
+        "mean_rmse": 0.06672391492774288
+      },
+      "pseudo_fold_improvements": [
+        0.00044176814105739703,
+        0.0010665501245008396,
+        0.0009810336551909216,
+        0.0007269588201042482
+      ],
+      "validation_fold_improvements": [
+        -0.00031064518517723294,
+        0.0014915990098852416,
+        0.001153601271277012,
+        0.00030324707166745624,
+        0.0015172167319082996
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "sensor"
+      ],
+      "features": 245,
+      "formula_features": 29,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.65,
+        "blend": 1.1500000000000001,
+        "pseudo_rmse": 0.06607871815062802,
+        "validation_rmse": 0.06655462740675686,
+        "mean_rmse": 0.06631667277869244
+      },
+      "pseudo_fold_improvements": [
+        0.0010891091218579868,
+        0.0019738254632745145,
+        0.001753733953138062,
+        0.0014466413968773628
+      ],
+      "validation_fold_improvements": [
+        -0.00030948542010100777,
+        0.0014904185198879177,
+        0.0015898734705956305,
+        0.0016946934508955819,
+        0.0002932193955980239
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "weather"
+      ],
+      "features": 226,
+      "formula_features": 10,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.75,
+        "blend": 1.05,
+        "pseudo_rmse": 0.06682471423744767,
+        "validation_rmse": 0.06635588381175987,
+        "mean_rmse": 0.06659029902460377
+      },
+      "pseudo_fold_improvements": [
+        0.00031905846008256633,
+        0.0009762092358572769,
+        0.0010614476905700804,
+        0.0009045203506725108
+      ],
+      "validation_fold_improvements": [
+        -0.0006688848154219051,
+        0.0022701618426351905,
+        0.001244694798339864,
+        0.000597737208147403,
+        0.0019056890290860273
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "reliability"
+      ],
+      "features": 224,
+      "formula_features": 8,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.75,
+        "blend": 1.0,
+        "pseudo_rmse": 0.06680126903028685,
+        "validation_rmse": 0.06660090398197359,
+        "mean_rmse": 0.06670108650613021
+      },
+      "pseudo_fold_improvements": [
+        0.00016848955905265917,
+        0.0010662282197404227,
+        0.0012686112295410695,
+        0.0008599660296742112
+      ],
+      "validation_fold_improvements": [
+        -0.0006005922882281189,
+        0.001725840193112213,
+        0.0016728366048409937,
+        0.0007865358163284125,
+        0.0009103457059967957
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "sensor",
+        "weather",
+        "reliability"
+      ],
+      "features": 263,
+      "formula_features": 47,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.7000000000000001,
+        "blend": 1.2000000000000002,
+        "pseudo_rmse": 0.06607623409544407,
+        "validation_rmse": 0.06627154870887828,
+        "mean_rmse": 0.06617389140216118
+      },
+      "pseudo_fold_improvements": [
+        0.0009302096244041963,
+        0.002080696180853138,
+        0.001911382909085546,
+        0.0013620750160037859
+      ],
+      "validation_fold_improvements": [
+        -0.0005887878072657754,
+        0.0020073426254441917,
+        0.0020381609777934268,
+        0.002228749957526213,
+        0.0005626170442941392
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "harmonic_gap",
+        "weather",
+        "reliability"
+      ],
+      "features": 253,
+      "formula_features": 37,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.7000000000000001,
+        "blend": 1.0,
+        "pseudo_rmse": 0.06678070513913677,
+        "validation_rmse": 0.06655727884596131,
+        "mean_rmse": 0.06666899199254904
+      },
+      "pseudo_fold_improvements": [
+        0.00048430430686077774,
+        0.0011207809420514178,
+        0.000979542825515628,
+        0.0008555165990253438
+      ],
+      "validation_fold_improvements": [
+        -0.0005563759914497535,
+        0.0017931359078844217,
+        0.001290266074353806,
+        0.0001753085634376983,
+        0.0017419452117539563
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "harmonic_gap",
+        "sensor",
+        "reliability"
+      ],
+      "features": 272,
+      "formula_features": 56,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.7000000000000001,
+        "blend": 1.2000000000000002,
+        "pseudo_rmse": 0.06619586553116374,
+        "validation_rmse": 0.06630912120945057,
+        "mean_rmse": 0.06625249337030716
+      },
+      "pseudo_fold_improvements": [
+        0.000908174981861451,
+        0.0017409294765675862,
+        0.001792267660500571,
+        0.0013439539801854
+      ],
+      "validation_fold_improvements": [
+        -0.00038947970004615806,
+        0.001330763589538389,
+        0.002259925806109807,
+        0.0020045407959647515,
+        0.0009117411854409341
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "harmonic_gap",
+        "sensor",
+        "weather"
+      ],
+      "features": 274,
+      "formula_features": 58,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.7000000000000001,
+        "blend": 1.2000000000000002,
+        "pseudo_rmse": 0.06628776143663491,
+        "validation_rmse": 0.0662189413946367,
+        "mean_rmse": 0.0662533514156358
+      },
+      "pseudo_fold_improvements": [
+        0.000981574810611785,
+        0.0017264367045886006,
+        0.0016158316118936311,
+        0.0010905417531185263
+      ],
+      "validation_fold_improvements": [
+        -0.0006355701633763422,
+        0.0017785183500069052,
+        0.0022148836111672426,
+        0.002034571164807819,
+        0.001101777110301655
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    },
+    {
+      "groups": [
+        "harmonic_gap",
+        "sensor",
+        "weather",
+        "reliability"
+      ],
+      "features": 282,
+      "formula_features": 66,
+      "base_pseudo_rmse": 0.06763192123624896,
+      "base_validation_rmse": 0.06743183725290512,
+      "best": {
+        "mix": 0.7000000000000001,
+        "blend": 1.25,
+        "pseudo_rmse": 0.06614410495713152,
+        "validation_rmse": 0.06614422039098737,
+        "mean_rmse": 0.06614416267405945
+      },
+      "pseudo_fold_improvements": [
+        0.000994775673467091,
+        0.0018337234923067186,
+        0.0018680059952574102,
+        0.0012952259318113057
+      ],
+      "validation_fold_improvements": [
+        -1.9590296177374178e-05,
+        0.0018625259558021912,
+        0.0020323849684048823,
+        0.0021444372373266435,
+        0.000805020350254787
+      ],
+      "improved_pseudo_folds": 4,
+      "improved_validation_folds": 4
+    }
+  ],
+  "formula_minus_plain_mean_rmse": -0.0005027459042679233
+}

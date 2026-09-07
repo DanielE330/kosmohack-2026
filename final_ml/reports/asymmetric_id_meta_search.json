@@ -1,0 +1,28 @@
+{
+  "model": "target-ID pseudo expert + ID-agnostic validation expert",
+  "features": 292,
+  "trees": 360,
+  "leaf": 3,
+  "best": {
+    "pseudo_model_weight": 0.8,
+    "blend": 1.05,
+    "pseudo_rmse": 0.06583732956085729,
+    "validation_rmse": 0.06587992688638393,
+    "mean_rmse": 0.06585862822362061
+  },
+  "pseudo_fold_improvements": [
+    0.0008688473481711784,
+    0.0034357381704814283,
+    0.0018921061847851223,
+    0.001157555107856173
+  ],
+  "validation_fold_improvements": [
+    0.0006170255572270772,
+    0.002723610936733442,
+    0.002847908430624775,
+    0.0018135480598029108,
+    0.0005076785366255193
+  ],
+  "improved_pseudo_folds": 4,
+  "improved_validation_folds": 5
+}
